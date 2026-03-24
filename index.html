@@ -341,25 +341,14 @@ canvas#proc{display:none}
 const workerCode = `
 'use strict';
 
-function blur3x3(src, w, h) {
-  const dst = new Uint8Array(w * h);
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      dst[y*w+x] = (
-        src[(y-1)*w+x-1] + src[(y-1)*w+x]*2 + src[(y-1)*w+x+1] +
-        src[y*w+x-1]*2   + src[y*w+x]*4     + src[y*w+x+1]*2 +
-        src[(y+1)*w+x-1] + src[(y+1)*w+x]*2 + src[(y+1)*w+x+1]
-      ) >> 4;
-    }
-  }
-  return dst;
-}
-
+// ================================================================
+// HELPERS
+// ================================================================
 function avgColor(pixels, indices) {
-  let r = 0, g = 0, b = 0;
-  for (const i of indices) { r += pixels[i]; g += pixels[i+1]; b += pixels[i+2]; }
-  const n = indices.length;
-  return n ? [r/n, g/n, b/n] : [0,0,0];
+  let r=0,g=0,b=0;
+  for (const i of indices) { r+=pixels[i]; g+=pixels[i+1]; b+=pixels[i+2]; }
+  const n=indices.length;
+  return n ? [r/n,g/n,b/n] : [0,0,0];
 }
 
 function colorDist(c1, c2) {
@@ -376,76 +365,197 @@ function colorVariance(pixels, indices) {
   return Math.sqrt(v / indices.length);
 }
 
-// Scan inward from one edge to find where the border ends (color transition)
-function findBorder(pixels, getIndices, maxDepth) {
-  // Sample the outermost strip as the "border color"
-  const edgeIdx = getIndices(0);
-  if (!edgeIdx.length) return 0;
-  const edgeColor = avgColor(pixels, edgeIdx);
-  const edgeVar = colorVariance(pixels, edgeIdx);
-
-  let borderWidth = 0;
-  const DIST_THRESH = 32;
-  const VAR_THRESH = edgeVar + 18;
-  let consecutive = 0;
-
-  for (let d = 1; d < maxDepth; d++) {
-    const idx = getIndices(d);
-    if (!idx.length) break;
-    const stripColor = avgColor(pixels, idx);
-    const dist = colorDist(stripColor, edgeColor);
-    const variance = colorVariance(pixels, idx);
-
-    if (dist > DIST_THRESH || variance > VAR_THRESH) {
-      consecutive++;
-      if (consecutive >= 2) { borderWidth = d - 1; break; }
-    } else {
-      consecutive = 0;
-    }
+// ================================================================
+// PHASE 1: Find the actual card edges within the cropped region
+// The guide frame crop may include some background around the card.
+// Use grayscale + Otsu to separate card from background, then find
+// the bounding box of the card pixels.
+// ================================================================
+function findCardInCrop(pixels, w, h) {
+  // Grayscale
+  const gray = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    gray[i] = (pixels[i*4]*77 + pixels[i*4+1]*150 + pixels[i*4+2]*29) >> 8;
   }
-  if (!borderWidth) borderWidth = maxDepth;
-  return borderWidth;
+
+  // Otsu threshold
+  const hist = new Int32Array(256);
+  for (let i = 0; i < gray.length; i++) hist[gray[i]]++;
+  const total = gray.length;
+  let sumAll = 0;
+  for (let i = 0; i < 256; i++) sumAll += i * hist[i];
+  let sumB=0, wB=0, best=0, threshold=128;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t];
+    if (!wB) continue;
+    const wF = total - wB;
+    if (!wF) break;
+    sumB += t * hist[t];
+    const d = sumB/wB - (sumAll-sumB)/wF;
+    const between = wB * wF * d * d;
+    if (between > best) { best = between; threshold = t; }
+  }
+
+  // Determine if card is brighter or darker than background
+  // Sample corners (likely background) vs center (likely card)
+  const cornerSamples = [];
+  const S = 5;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) cornerSamples.push(gray[y*w+x]);
+  for (let y = 0; y < S; y++) for (let x = w-S; x < w; x++) cornerSamples.push(gray[y*w+x]);
+  for (let y = h-S; y < h; y++) for (let x = 0; x < S; x++) cornerSamples.push(gray[y*w+x]);
+  for (let y = h-S; y < h; y++) for (let x = w-S; x < w; x++) cornerSamples.push(gray[y*w+x]);
+  const cornerAvg = cornerSamples.reduce((a,b)=>a+b,0) / cornerSamples.length;
+
+  const centerSamples = [];
+  const cx = w>>1, cy = h>>1;
+  for (let y = cy-S; y <= cy+S; y++) for (let x = cx-S; x <= cx+S; x++) centerSamples.push(gray[y*w+x]);
+  const centerAvg = centerSamples.reduce((a,b)=>a+b,0) / centerSamples.length;
+
+  // Card is the region that differs from the corners
+  const cardIsBright = centerAvg > cornerAvg;
+
+  // Build projection: for each row/col, what fraction is "card" pixels
+  const rowCard = new Float32Array(h);
+  const colCard = new Float32Array(w);
+  for (let y = 0; y < h; y++) {
+    let cnt = 0;
+    for (let x = 0; x < w; x++) {
+      const isCard = cardIsBright ? (gray[y*w+x] > threshold) : (gray[y*w+x] <= threshold);
+      if (isCard) cnt++;
+    }
+    rowCard[y] = cnt / w;
+  }
+  for (let x = 0; x < w; x++) {
+    let cnt = 0;
+    for (let y = 0; y < h; y++) {
+      const isCard = cardIsBright ? (gray[y*w+x] > threshold) : (gray[y*w+x] <= threshold);
+      if (isCard) cnt++;
+    }
+    colCard[x] = cnt / h;
+  }
+
+  // Find card edges where projection exceeds threshold
+  const T = 0.4;
+  let top=-1, bot=-1, left=-1, right=-1;
+  for (let y = 0; y < h; y++) { if (rowCard[y] > T) { if (top<0) top=y; bot=y; } }
+  for (let x = 0; x < w; x++) { if (colCard[x] > T) { if (left<0) left=x; right=x; } }
+
+  // Fallback: if detection fails, assume card fills most of the frame
+  // (user positioned it in the guide)
+  if (top < 0 || bot < 0 || left < 0 || right < 0 ||
+      (right-left) < w*0.3 || (bot-top) < h*0.3) {
+    // Use a small margin assuming card almost fills the guide
+    const margin = Math.round(Math.min(w, h) * 0.03);
+    return { left: margin, top: margin, right: w-margin, bot: h-margin, fallback: true };
+  }
+
+  return { left, top, right, bot, fallback: false };
 }
 
+// ================================================================
+// PHASE 2: Within the detected card, find the inner printed border
+// Scans inward from each card edge to find where the uniform border
+// color transitions to the varied artwork.
+// ================================================================
+function findInnerBorder(pixels, w, cardL, cardT, cardR, cardB) {
+  const cardW = cardR - cardL;
+  const cardH = cardB - cardT;
+
+  // Sample the middle 60% of each edge to avoid corners
+  const yMid1 = cardT + Math.floor(cardH * 0.2);
+  const yMid2 = cardT + Math.floor(cardH * 0.8);
+  const xMid1 = cardL + Math.floor(cardW * 0.2);
+  const xMid2 = cardL + Math.floor(cardW * 0.8);
+  const maxH = Math.floor(cardW * 0.30);
+  const maxV = Math.floor(cardH * 0.30);
+
+  function scanBorder(getIndices, maxDepth) {
+    const edgeIdx = getIndices(0);
+    if (!edgeIdx.length) return 0;
+    const edgeColor = avgColor(pixels, edgeIdx);
+    const edgeVar = colorVariance(pixels, edgeIdx);
+
+    const DIST_THRESH = 28;
+    const VAR_THRESH = Math.max(edgeVar + 15, 25);
+    let consecutive = 0;
+
+    for (let d = 1; d < maxDepth; d++) {
+      const idx = getIndices(d);
+      if (!idx.length) break;
+      const stripColor = avgColor(pixels, idx);
+      const dist = colorDist(stripColor, edgeColor);
+      const variance = colorVariance(pixels, idx);
+
+      if (dist > DIST_THRESH || variance > VAR_THRESH) {
+        consecutive++;
+        if (consecutive >= 2) return d - 1;
+      } else {
+        consecutive = 0;
+      }
+    }
+    return maxDepth; // no transition found
+  }
+
+  // Left border: scan from card left edge rightward
+  const bLeft = scanBorder((d) => {
+    const x = cardL + d;
+    const idx = [];
+    for (let y = yMid1; y < yMid2; y += 2) idx.push((y*w+x)*4);
+    return idx;
+  }, maxH);
+
+  // Right border: scan from card right edge leftward
+  const bRight = scanBorder((d) => {
+    const x = cardR - 1 - d;
+    const idx = [];
+    for (let y = yMid1; y < yMid2; y += 2) idx.push((y*w+x)*4);
+    return idx;
+  }, maxH);
+
+  // Top border: scan from card top edge downward
+  const bTop = scanBorder((d) => {
+    const y = cardT + d;
+    const idx = [];
+    for (let x = xMid1; x < xMid2; x += 2) idx.push((y*w+x)*4);
+    return idx;
+  }, maxV);
+
+  // Bottom border: scan from card bottom edge upward
+  const bBottom = scanBorder((d) => {
+    const y = cardB - 1 - d;
+    const idx = [];
+    for (let x = xMid1; x < xMid2; x += 2) idx.push((y*w+x)*4);
+    return idx;
+  }, maxV);
+
+  const valid = (bLeft < maxH - 2) && (bRight < maxH - 2) &&
+                (bTop < maxV - 2) && (bBottom < maxV - 2);
+
+  return { left: bLeft, right: bRight, top: bTop, bottom: bBottom, valid };
+}
+
+// ================================================================
+// MAIN PIPELINE
+// ================================================================
 self.onmessage = function(e) {
   const { data: pixels, width: w, height: h } = e.data;
 
-  // Use middle 60% of each edge to avoid corners
-  const yStart = Math.floor(h * 0.2), yEnd = Math.floor(h * 0.8);
-  const xStart = Math.floor(w * 0.2), xEnd = Math.floor(w * 0.8);
-  const maxHoriz = Math.floor(w * 0.35);
-  const maxVert = Math.floor(h * 0.35);
+  // Phase 1: Find the card within the cropped region
+  const card = findCardInCrop(pixels, w, h);
 
-  const left = findBorder(pixels, (d) => {
-    const idx = [];
-    for (let y = yStart; y < yEnd; y += 2) idx.push((y*w+d)*4);
-    return idx;
-  }, maxHoriz);
+  // Phase 2: Find inner borders within the card
+  const borders = findInnerBorder(pixels, w, card.left, card.top, card.right, card.bot);
 
-  const right = findBorder(pixels, (d) => {
-    const idx = [];
-    for (let y = yStart; y < yEnd; y += 2) idx.push((y*w+(w-1-d))*4);
-    return idx;
-  }, maxHoriz);
-
-  const top = findBorder(pixels, (d) => {
-    const idx = [];
-    for (let x = xStart; x < xEnd; x += 2) idx.push((d*w+x)*4);
-    return idx;
-  }, maxVert);
-
-  const bottom = findBorder(pixels, (d) => {
-    const idx = [];
-    for (let x = xStart; x < xEnd; x += 2) idx.push(((h-1-d)*w+x)*4);
-    return idx;
-  }, maxVert);
-
-  // Validate: borders should be reasonable (not the max depth, which means
-  // the whole image was uniform — likely bad crop or no card)
-  const valid = (left < maxHoriz - 2) && (right < maxHoriz - 2) &&
-                (top < maxVert - 2) && (bottom < maxVert - 2);
-
-  self.postMessage({ left, right, top, bottom, valid });
+  self.postMessage({
+    // Card position within the crop (for overlay drawing)
+    cardLeft: card.left, cardTop: card.top,
+    cardRight: card.right, cardBot: card.bot,
+    cardFallback: card.fallback,
+    // Inner border widths (relative to card edges)
+    left: borders.left, right: borders.right,
+    top: borders.top, bottom: borders.bottom,
+    valid: borders.valid
+  });
 };
 `;
 
@@ -976,23 +1086,29 @@ function showResultsSuccess(res) {
   document.getElementById('result-failed').style.display = 'none';
   document.getElementById('results-failed-actions').style.display = 'none';
 
-  const card = croppedCardCanvas;
-  const W = card.width, H = card.height;
+  const cropCanvas = croppedCardCanvas;
+  const W = cropCanvas.width, H = cropCanvas.height;
 
-  // Draw the cropped card
+  // Draw the cropped image
   resultCanvas.width = W;
   resultCanvas.height = H;
-  resultCtx.drawImage(card, 0, 0);
+  resultCtx.drawImage(cropCanvas, 0, 0);
 
-  // Border widths from analysis (at 300x420) mapped to card canvas
+  // Card position within the crop (from Phase 1 detection)
   const scaleX = W / AW;
   const scaleY = H / AH;
+  const cardL = (res.cardLeft || 0) * scaleX;
+  const cardT = (res.cardTop || 0) * scaleY;
+  const cardR = (res.cardRight || AW) * scaleX;
+  const cardB = (res.cardBot || AH) * scaleY;
+
+  // Inner border widths are relative to card edges, map to canvas pixels
   const bL = res.left * scaleX;
   const bR = res.right * scaleX;
   const bT = res.top * scaleY;
   const bB = res.bottom * scaleY;
 
-  // Compute centering ratios
+  // Compute centering ratios from inner border widths
   const lrR = Math.min(bL, bR) > 0 ? Math.max(bL, bR) / Math.min(bL, bR) : 99;
   const tbR = Math.min(bT, bB) > 0 ? Math.max(bT, bB) / Math.min(bT, bB) : 99;
   const lrT = bL + bR, tbT = bT + bB;
@@ -1013,63 +1129,60 @@ function showResultsSuccess(res) {
   const c = resultCtx;
   const scale = Math.max(W, H) / 600;
 
-  // Inner border lines (dashed green)
-  c.strokeStyle = 'rgba(52,211,153,0.6)';
-  c.lineWidth = Math.max(1, 2 * scale);
-  c.setLineDash([6 * scale, 8 * scale]);
-
-  // Left inner border line
-  c.beginPath(); c.moveTo(bL, 12 * scale); c.lineTo(bL, H - 12 * scale); c.stroke();
-  // Right inner border line
-  c.beginPath(); c.moveTo(W - bR, 12 * scale); c.lineTo(W - bR, H - 12 * scale); c.stroke();
-  // Top inner border line
-  c.beginPath(); c.moveTo(12 * scale, bT); c.lineTo(W - 12 * scale, bT); c.stroke();
-  // Bottom inner border line
-  c.beginPath(); c.moveTo(12 * scale, H - bB); c.lineTo(W - 12 * scale, H - bB); c.stroke();
-  c.setLineDash([]);
-
-  // Center crosshair
-  c.strokeStyle = 'rgba(255,255,255,0.08)';
-  c.setLineDash([5 * scale, 10 * scale]);
-  c.lineWidth = Math.max(1, 1.5 * scale);
-  c.beginPath(); c.moveTo(W / 2, 14 * scale); c.lineTo(W / 2, H - 14 * scale); c.stroke();
-  c.beginPath(); c.moveTo(14 * scale, H / 2); c.lineTo(W - 14 * scale, H / 2); c.stroke();
-  c.setLineDash([]);
-
-  // Border width labels
-  const fontSize = Math.max(12, 16 * scale);
-  c.font = '700 ' + fontSize + 'px "Inter",system-ui,sans-serif';
-  c.textAlign = 'center';
-  c.textBaseline = 'middle';
-
-  const lblOffset = Math.max(20, 24 * scale);
-  drawLabel(c, '' + res.left, bL / 2, H / 2, '#fb923c', scale);
-  drawLabel(c, '' + res.right, W - bR / 2, H / 2, '#fb923c', scale);
-  drawLabel(c, '' + res.top, W / 2, bT / 2, '#38bdf8', scale);
-  drawLabel(c, '' + res.bottom, W / 2, H - bB / 2, '#38bdf8', scale);
-
-  c.textBaseline = 'alphabetic';
+  // --- Dim area outside the detected card ---
+  c.fillStyle = 'rgba(0,0,0,0.4)';
+  c.fillRect(0, 0, W, cardT);
+  c.fillRect(0, cardB, W, H - cardB);
+  c.fillRect(0, cardT, cardL, cardB - cardT);
+  c.fillRect(cardR, cardT, W - cardR, cardB - cardT);
 
   // Card outline with grade color glow
-  const cardR = Math.min(W, H) * 0.025;
+  const cornerR = Math.min(cardR - cardL, cardB - cardT) * 0.025;
   c.strokeStyle = gradeColor;
   c.lineWidth = Math.max(2, 3 * scale);
   c.shadowColor = gradeColor;
   c.shadowBlur = 16 * scale;
-  roundRectPath(c, 0, 0, W, H, cardR);
+  roundRectPath(c, cardL, cardT, cardR - cardL, cardB - cardT, cornerR);
   c.stroke();
   c.shadowBlur = 0;
 
-  // Corner brackets
-  const bLen = Math.min(40, W * 0.08, H * 0.06) * Math.max(1, scale);
+  // Corner brackets on the CARD (not the crop frame)
+  const bLen = Math.min(40, (cardR-cardL) * 0.08, (cardB-cardT) * 0.06) * Math.max(1, scale);
   c.strokeStyle = 'rgba(255,255,255,0.85)';
   c.lineWidth = Math.max(2, 3 * scale);
   c.lineCap = 'round';
-  [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]].forEach(([px, py, dx, dy]) => {
-    c.beginPath(); c.moveTo(px, py); c.lineTo(px + dx * bLen, py); c.stroke();
-    c.beginPath(); c.moveTo(px, py); c.lineTo(px, py + dy * bLen); c.stroke();
+  [[cardL,cardT,1,1],[cardR,cardT,-1,1],[cardL,cardB,1,-1],[cardR,cardB,-1,-1]].forEach(([px,py,dx,dy]) => {
+    c.beginPath(); c.moveTo(px,py); c.lineTo(px+dx*bLen,py); c.stroke();
+    c.beginPath(); c.moveTo(px,py); c.lineTo(px,py+dy*bLen); c.stroke();
   });
   c.lineCap = 'butt';
+
+  // Inner border lines (dashed green) — offset from CARD edges
+  c.strokeStyle = 'rgba(52,211,153,0.6)';
+  c.lineWidth = Math.max(1, 2 * scale);
+  c.setLineDash([6 * scale, 8 * scale]);
+  const innerL = cardL + bL;
+  const innerR = cardR - bR;
+  const innerT = cardT + bT;
+  const innerB = cardB - bB;
+  c.beginPath(); c.moveTo(innerL, cardT + 8*scale); c.lineTo(innerL, cardB - 8*scale); c.stroke();
+  c.beginPath(); c.moveTo(innerR, cardT + 8*scale); c.lineTo(innerR, cardB - 8*scale); c.stroke();
+  c.beginPath(); c.moveTo(cardL + 8*scale, innerT); c.lineTo(cardR - 8*scale, innerT); c.stroke();
+  c.beginPath(); c.moveTo(cardL + 8*scale, innerB); c.lineTo(cardR - 8*scale, innerB); c.stroke();
+  c.setLineDash([]);
+
+  // Border width labels — positioned between card edge and inner border
+  const fontSize = Math.max(12, 16 * scale);
+  c.font = '700 ' + fontSize + 'px "Inter",system-ui,sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  const cardMidY = (cardT + cardB) / 2;
+  const cardMidX = (cardL + cardR) / 2;
+  drawLabel(c, '' + res.left, cardL + bL/2, cardMidY, '#fb923c', scale);
+  drawLabel(c, '' + res.right, cardR - bR/2, cardMidY, '#fb923c', scale);
+  drawLabel(c, '' + res.top, cardMidX, cardT + bT/2, '#38bdf8', scale);
+  drawLabel(c, '' + res.bottom, cardMidX, cardB - bB/2, '#38bdf8', scale);
+  c.textBaseline = 'alphabetic';
 
   // --- Update UI ---
   document.documentElement.style.setProperty('--grade-color', gradeColor);
