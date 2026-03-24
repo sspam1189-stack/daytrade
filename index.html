@@ -158,17 +158,17 @@ canvas#result-canvas{
   display:block;
 }
 .result-grade-badge{
-  position:absolute;top:12px;right:12px;z-index:3;
-  background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  border:2px solid var(--grade-color);border-radius:14px;
-  padding:8px 14px;display:flex;align-items:center;gap:10px;
+  display:flex;align-items:center;gap:14px;
+  background:rgba(255,255,255,0.03);border:2px solid var(--grade-color);border-radius:14px;
+  padding:12px 18px;margin-bottom:12px;
   transition:border-color .3s,box-shadow .3s;
   box-shadow:0 4px 24px var(--grade-glow);
 }
-.result-grade-num{font-weight:900;font-size:1.6rem;color:var(--grade-color);line-height:1}
-.result-grade-info{display:flex;flex-direction:column;gap:2px}
-.result-grade-label{font-weight:700;font-size:.5rem;color:rgba(255,255,255,0.4);letter-spacing:.15em;text-transform:uppercase}
-.result-grade-desc{font-weight:600;font-size:.7rem;color:#ccc}
+.result-grade-num{font-weight:900;font-size:2.4rem;color:var(--grade-color);line-height:1}
+.result-grade-info{display:flex;flex-direction:column;gap:3px}
+.result-grade-label{font-weight:700;font-size:.55rem;color:rgba(255,255,255,0.4);letter-spacing:.15em;text-transform:uppercase}
+.result-grade-desc{font-weight:600;font-size:.8rem;color:#ccc}
+.result-grade-mode{font-weight:600;font-size:.5rem;color:#555;letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
 
 .results-stats{
   flex-shrink:0;
@@ -282,15 +282,6 @@ canvas#proc{display:none}
 <div class="screen" id="screen-results">
   <div class="results-image-wrap" id="results-image-wrap">
     <canvas id="result-canvas"></canvas>
-    <div class="result-grade-badge" id="result-grade-badge" style="display:none">
-      <div>
-        <div class="result-grade-num" id="result-grade-num">--</div>
-        <div class="result-grade-label">PSA</div>
-      </div>
-      <div class="result-grade-info">
-        <div class="result-grade-desc" id="result-grade-desc">--</div>
-      </div>
-    </div>
     <div class="result-failed" id="result-failed" style="display:none">
       <div class="result-failed-icon">&#x26A0;</div>
       <div class="result-failed-title">Border Not Detected</div>
@@ -298,6 +289,16 @@ canvas#proc{display:none}
     </div>
   </div>
   <div class="results-stats" id="results-stats" style="display:none">
+    <div class="result-grade-badge" id="result-grade-badge">
+      <div>
+        <div class="result-grade-num" id="result-grade-num">--</div>
+        <div class="result-grade-label">PSA</div>
+      </div>
+      <div class="result-grade-info">
+        <div class="result-grade-desc" id="result-grade-desc">--</div>
+        <div class="result-grade-mode" id="result-grade-mode">BORDER MODE</div>
+      </div>
+    </div>
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">&#x25C0; Left / Right &#x25B6;</div>
@@ -961,7 +962,6 @@ function showResultsFailed() {
     resultCtx.fillRect(0, 0, croppedCardCanvas.width, croppedCardCanvas.height);
   }
 
-  document.getElementById('result-grade-badge').style.display = 'none';
   document.getElementById('result-failed').style.display = 'flex';
   document.getElementById('results-stats').style.display = 'none';
   document.getElementById('results-failed-actions').style.display = 'block';
@@ -1083,6 +1083,7 @@ function showResultsSuccess(res) {
   document.getElementById('result-grade-num').textContent = grade;
   document.getElementById('result-grade-num').style.color = gradeColor;
   document.getElementById('result-grade-desc').textContent = gradeDesc;
+  document.getElementById('result-grade-mode').textContent = 'BORDER MODE \u00B7 ' + worst.toFixed(2) + ':1 worst axis';
 
   const statsPanel = document.getElementById('results-stats');
   statsPanel.style.display = 'block';
