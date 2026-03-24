@@ -3,455 +3,315 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Centering Cam</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--yellow:#fbbf24;--green:#34d399;--red:#f87171;--orange:#fb923c;--cyan:#38bdf8;--bg:#0a0a0a;--panel:#111;--border:#222;--grade-color:#555;--grade-glow:rgba(85,85,85,0.3)}
-body{background:#000;color:#fff;font-family:'Inter',sans-serif;height:100dvh;width:100dvw;overflow:hidden;position:relative;-webkit-tap-highlight-color:transparent}
-
-/* --- HEADER (hidden - full screen camera) --- */
-header{display:none}
-
-/* --- CAMERA AREA (full screen) --- */
-#cam-wrap{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;background:#000}
-video{width:100%;height:100%;object-fit:cover;display:block}
-canvas#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
-canvas#proc{display:none}
-
-/* --- CONTROLS --- */
-#controls{position:absolute;top:50%;right:14px;transform:translateY(-50%);z-index:10;display:flex;flex-direction:column;gap:10px}
-.ctrl-btn{width:44px;height:44px;border-radius:50%;background:rgba(20,20,24,0.55);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);color:#ccc;font-size:1.1rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .3s ease;-webkit-tap-highlight-color:transparent;outline:none;padding:0}
-.ctrl-btn:active{transform:scale(0.9)}
-.ctrl-btn.active{border-color:var(--green);color:var(--green);box-shadow:0 0 12px rgba(52,211,153,0.2)}
-#lock-btn{border-color:var(--yellow);color:var(--yellow)}
-#lock-btn.locked{border-color:var(--green);color:var(--green);box-shadow:0 0 12px rgba(52,211,153,0.2)}
-#torch-btn.on{border-color:var(--yellow);color:var(--yellow);box-shadow:0 0 12px rgba(251,191,36,0.2)}
-
-/* --- START MESSAGE --- */
-#start-msg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.92);z-index:20;gap:14px;text-align:center;padding:24px}
-#start-msg h2{font-family:'Inter',sans-serif;font-size:1.8rem;font-weight:900;color:var(--yellow)}
-#start-msg p{font-size:.75rem;color:#888;max-width:280px;line-height:1.7}
-#start-btn{background:var(--yellow);color:#000;border:none;padding:14px 32px;font-family:'Inter',sans-serif;font-weight:900;font-size:1.1rem;letter-spacing:.1em;text-transform:uppercase;border-radius:24px;cursor:pointer;margin-top:4px}
-#tip{font-size:.65rem;color:#444;margin-top:-4px}
-
-/* --- STATUS BAR (moved up to avoid drawer overlap) --- */
-#status-bar{position:absolute;bottom:52px;left:50%;transform:translateX(-50%);font-size:.62rem;color:#aaa;background:rgba(0,0,0,.65);padding:4px 12px;border-radius:20px;z-index:5;pointer-events:none;letter-spacing:.08em;white-space:nowrap;transition:bottom .3s ease, opacity .3s ease}
-#flash-overlay{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:15;transition:opacity .2s ease-out}
+:root{
+  --green:#34d399;--lime:#a3e635;--yellow:#fbbf24;--orange:#fb923c;--red:#f87171;
+  --cyan:#38bdf8;--bg:#0a0a0a;--panel:rgba(18,18,22,0.85);--border:rgba(255,255,255,0.08);
+  --grade-color:#555;--grade-glow:rgba(85,85,85,0.3);
+}
+body{background:#000;color:#fff;font-family:'Inter',system-ui,sans-serif;height:100dvh;width:100dvw;overflow:hidden;position:relative;-webkit-tap-highlight-color:transparent}
 
 /* ============================================================
-   FLOATING HUD GRADE BADGE
-   Positioned bottom-left of camera feed, always visible
-   Contains: stability ring (SVG) + grade number + description
+   SCREENS — only one visible at a time
    ============================================================ */
-#hud-badge{
-  position:absolute;bottom:60px;left:12px;z-index:11;
-  display:flex;align-items:center;gap:10px;
-  background:rgba(0,0,0,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  border:1.5px solid rgba(255,255,255,.1);border-radius:16px;
-  padding:8px 14px 8px 8px;
-  transition:border-color .4s ease, box-shadow .4s ease, opacity .3s ease;
+.screen{position:absolute;inset:0;width:100%;height:100%;display:none;flex-direction:column}
+.screen.active{display:flex}
+
+/* ============================================================
+   START SCREEN
+   ============================================================ */
+#screen-start{
+  align-items:center;justify-content:center;gap:16px;text-align:center;padding:32px;
+  background:radial-gradient(ellipse at 50% 40%,rgba(52,211,153,0.06) 0%,#0a0a0a 70%);
+}
+.start-icon{font-size:3rem;margin-bottom:4px;filter:grayscale(0.3)}
+.start-title{font-weight:900;font-size:1.8rem;letter-spacing:-0.02em;background:linear-gradient(135deg,#fff 60%,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.start-sub{font-size:.8rem;color:#777;max-width:280px;line-height:1.7}
+.start-actions{display:flex;flex-direction:column;gap:10px;margin-top:8px;width:100%;max-width:260px}
+.btn-primary{
+  background:var(--green);color:#000;border:none;padding:16px 32px;font-family:'Inter',sans-serif;
+  font-weight:800;font-size:1rem;letter-spacing:.06em;border-radius:16px;cursor:pointer;
+  transition:transform .15s,opacity .15s;
+}
+.btn-primary:active{transform:scale(0.96);opacity:.85}
+.btn-secondary{
+  background:rgba(255,255,255,0.06);color:#aaa;border:1px solid rgba(255,255,255,0.1);padding:14px 24px;
+  font-family:'Inter',sans-serif;font-weight:600;font-size:.85rem;border-radius:14px;cursor:pointer;
+  transition:transform .15s,opacity .15s;
+}
+.btn-secondary:active{transform:scale(0.96);opacity:.85}
+.start-tip{font-size:.6rem;color:#444;margin-top:4px}
+
+/* ============================================================
+   CAMERA SCREEN
+   ============================================================ */
+#screen-camera{background:#000}
+#cam-wrap{position:relative;flex:1;overflow:hidden}
+video{width:100%;height:100%;object-fit:cover;display:block}
+canvas#guide-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+
+/* Camera utility buttons — top row */
+.cam-top-bar{
+  position:absolute;top:0;left:0;right:0;z-index:10;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 16px;
+  background:linear-gradient(to bottom,rgba(0,0,0,0.5),transparent);
+}
+.cam-top-left,.cam-top-right{display:flex;gap:8px}
+.cam-btn{
+  width:42px;height:42px;border-radius:50%;
+  background:rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,0.1);color:#ddd;font-size:1.1rem;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:all .2s;outline:none;padding:0;
+}
+.cam-btn:active{transform:scale(0.9);opacity:.7}
+.cam-btn.active{border-color:var(--yellow);color:var(--yellow);box-shadow:0 0 12px rgba(251,191,36,0.2)}
+
+/* Capture button — bottom center */
+.cam-bottom-bar{
+  position:absolute;bottom:0;left:0;right:0;z-index:10;
+  display:flex;justify-content:center;align-items:center;
+  padding:20px 0 max(20px, env(safe-area-inset-bottom));
+  background:linear-gradient(to top,rgba(0,0,0,0.5),transparent);
+}
+#capture-btn{
+  width:72px;height:72px;border-radius:50%;
+  background:#fff;border:4px solid rgba(255,255,255,0.3);
+  cursor:pointer;position:relative;
+  transition:transform .12s;outline:none;
+  box-shadow:0 2px 20px rgba(0,0,0,0.4);
+}
+#capture-btn:active{transform:scale(0.92)}
+#capture-btn::after{
+  content:'';position:absolute;inset:4px;border-radius:50%;
+  border:2px solid rgba(0,0,0,0.08);
+}
+/* Upload button — bottom left of capture */
+.cam-bottom-side{
+  position:absolute;bottom:0;left:0;right:0;z-index:9;
+  display:flex;justify-content:space-between;align-items:center;
+  padding:32px 28px max(32px, env(safe-area-inset-bottom));
   pointer-events:none;
 }
-#hud-badge.has-grade{border-color:var(--grade-color);box-shadow:0 0 20px var(--grade-glow),0 4px 20px rgba(0,0,0,.6)}
-
-/* Stability ring — 88px SVG circle wrapping grade text */
-.stability-ring-wrap{position:relative;width:64px;height:64px;flex-shrink:0}
-.stability-ring-wrap svg{width:64px;height:64px;transform:rotate(-90deg)}
-.stability-ring-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:4}
-.stability-ring-fill{fill:none;stroke:var(--grade-color);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .4s ease,stroke .4s ease}
-.grade-center{
-  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-}
-.grade-center .grade-num{
-  font-family:'Inter',sans-serif;font-weight:900;font-size:1.6rem;line-height:1;
-  color:var(--grade-color);transition:color .3s ease;
-}
-.grade-center .grade-psa{
-  font-family:'Inter',sans-serif;font-weight:700;font-size:.5rem;
-  letter-spacing:.15em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-top:1px;
-}
-
-/* HUD info column beside the ring */
-.hud-info{display:flex;flex-direction:column;gap:3px;min-width:0}
-.hud-desc{font-family:'Inter',sans-serif;font-weight:700;font-size:.75rem;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hud-stability{font-size:.55rem;letter-spacing:.12em;text-transform:uppercase;transition:color .3s ease}
-.hud-mode{font-size:.5rem;letter-spacing:.1em;color:#555;text-transform:uppercase}
+.cam-bottom-side .cam-btn{pointer-events:auto}
+#file-input{display:none}
 
 /* ============================================================
-   FLOATING RATIO GAUGES (mini donuts)
-   Bottom-right of camera feed
+   ANALYZING SCREEN
    ============================================================ */
-#hud-ratios{
-  position:absolute;bottom:60px;right:12px;z-index:11;
-  display:flex;gap:8px;pointer-events:none;
-  transition:opacity .3s ease;
+#screen-analyzing{
+  align-items:center;justify-content:center;gap:16px;background:#000;
 }
-.ratio-gauge{
-  background:rgba(0,0,0,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  border:1px solid rgba(255,255,255,.08);border-radius:12px;
-  padding:6px;display:flex;flex-direction:column;align-items:center;gap:2px;
-  width:64px;
+#frozen-frame{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.6}
+.analyzing-overlay{
+  position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:14px;
 }
-.ratio-gauge svg{width:44px;height:44px;transform:rotate(-90deg)}
-.ratio-arc-bg{fill:none;stroke:rgba(255,255,255,.06);stroke-width:5}
-.ratio-arc-left{fill:none;stroke-width:5;stroke-linecap:round}
-.ratio-arc-right{fill:none;stroke-width:5;stroke-linecap:round;opacity:.35}
-.ratio-center-text{
-  font-family:'Inter',sans-serif;font-weight:900;font-size:.7rem;
-  fill:#fff;text-anchor:middle;dominant-baseline:central;
+.spinner{
+  width:48px;height:48px;border:3px solid rgba(255,255,255,0.1);
+  border-top-color:var(--green);border-radius:50%;
+  animation:spin .8s linear infinite;
 }
-.ratio-label{font-size:.45rem;color:#555;letter-spacing:.12em;text-transform:uppercase;font-family:'Inter',sans-serif}
-.ratio-pct{font-family:'Inter',sans-serif;font-weight:700;font-size:.6rem;color:#888}
+@keyframes spin{to{transform:rotate(360deg)}}
+.analyzing-text{font-weight:600;font-size:.9rem;color:#aaa;letter-spacing:.08em}
 
 /* ============================================================
-   SWIPE-UP DETAILS DRAWER
-   Sits at bottom of cam-wrap, slides up on tap/drag
+   RESULTS SCREEN
    ============================================================ */
-#drawer{
-  position:absolute;bottom:0;left:0;right:0;z-index:12;
-  background:rgba(10,10,10,.95);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  border-top:2px solid var(--grade-color);
-  border-radius:16px 16px 0 0;
-  transform:translateY(calc(100% - 44px));
-  transition:transform .35s cubic-bezier(.4,0,.2,1),border-color .4s ease;
-  max-height:70vh;
-  -webkit-tap-highlight-color:transparent;
-}
-#drawer.open{transform:translateY(0)}
-
-/* Drawer handle */
-.drawer-handle{
+#screen-results{background:var(--bg)}
+.results-image-wrap{
+  position:relative;flex:1;min-height:0;overflow:hidden;
   display:flex;align-items:center;justify-content:center;
-  padding:10px 0 6px;cursor:pointer;
+  background:#000;
 }
-.drawer-handle-bar{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.2);transition:background .3s ease}
-#drawer.open .drawer-handle-bar{background:var(--grade-color)}
-.drawer-peek{
-  display:flex;align-items:center;justify-content:center;gap:12px;
-  padding:0 16px 10px;font-size:.6rem;color:#666;letter-spacing:.1em;text-transform:uppercase;
-  font-family:'Inter',sans-serif;cursor:pointer;
+canvas#result-canvas{
+  max-width:100%;max-height:100%;object-fit:contain;
+  display:block;
 }
-.drawer-peek-grade{font-weight:900;font-size:.8rem;transition:color .3s ease}
-
-/* Drawer content */
-.drawer-content{padding:4px 16px 16px;overflow-y:auto;max-height:calc(70vh - 44px)}
-.drawer-section{margin-bottom:14px}
-.drawer-section-title{font-size:.55rem;color:#444;letter-spacing:.18em;text-transform:uppercase;margin-bottom:8px;font-family:'Inter',sans-serif}
-
-/* Detail stat rows */
-.detail-stat{
-  display:flex;align-items:center;justify-content:space-between;
-  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
-  border-radius:8px;padding:10px 12px;margin-bottom:6px;
+/* Grade badge overlaid on result image */
+.result-grade-badge{
+  position:absolute;top:12px;right:12px;z-index:3;
+  background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:2px solid var(--grade-color);border-radius:14px;
+  padding:8px 14px;display:flex;align-items:center;gap:10px;
+  transition:border-color .3s,box-shadow .3s;
+  box-shadow:0 4px 24px var(--grade-glow);
 }
-.detail-stat-left{display:flex;flex-direction:column;gap:2px}
-.detail-stat-label{font-size:.55rem;color:#555;letter-spacing:.12em;text-transform:uppercase}
-.detail-stat-value{font-family:'Inter',sans-serif;font-weight:900;font-size:1.3rem}
-.detail-stat-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
-.detail-stat-ratio{font-family:'Inter',sans-serif;font-weight:700;font-size:.9rem;color:#888}
-.detail-stat-pct{font-size:.6rem;color:#555}
+.result-grade-num{font-weight:900;font-size:1.6rem;color:var(--grade-color);line-height:1}
+.result-grade-info{display:flex;flex-direction:column;gap:2px}
+.result-grade-label{font-weight:700;font-size:.5rem;color:rgba(255,255,255,0.4);letter-spacing:.15em;text-transform:uppercase}
+.result-grade-desc{font-weight:600;font-size:.7rem;color:#ccc}
 
-/* Split bar in drawer — shows L vs R or T vs B distribution */
-.split-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:6px;background:#1a1a1a}
-.split-bar-left{height:100%;transition:width .2s ease;border-radius:3px 0 0 3px}
-.split-bar-right{height:100%;transition:width .2s ease;border-radius:0 3px 3px 0;opacity:.4}
-
-/* Grade detail card in drawer */
-.grade-detail-card{
-  background:rgba(255,255,255,.03);border:2px solid var(--grade-color);
-  border-radius:12px;padding:14px;display:flex;align-items:center;gap:14px;
-  transition:border-color .4s ease;
+/* Stats panel below image */
+.results-stats{
+  flex-shrink:0;
+  background:var(--panel);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-top:1px solid var(--border);
+  padding:14px 16px max(14px, env(safe-area-inset-bottom));
+  overflow-y:auto;max-height:45vh;
 }
-.grade-detail-ring{position:relative;width:72px;height:72px;flex-shrink:0}
-.grade-detail-ring svg{width:72px;height:72px;transform:rotate(-90deg)}
-.grade-detail-ring .stability-ring-bg{stroke-width:3.5}
-.grade-detail-ring .stability-ring-fill{stroke-width:3.5}
-.grade-detail-center{
-  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.stat-card{
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px;padding:10px 12px;
 }
-.grade-detail-center .grade-num{font-family:'Inter',sans-serif;font-weight:900;font-size:1.8rem;line-height:1;color:var(--grade-color);transition:color .3s}
-.grade-detail-center .grade-psa{font-family:'Inter',sans-serif;font-weight:700;font-size:.5rem;letter-spacing:.15em;color:rgba(255,255,255,.4);text-transform:uppercase;margin-top:1px}
-.grade-detail-info{display:flex;flex-direction:column;gap:4px}
-.grade-detail-desc{font-family:'Inter',sans-serif;font-weight:700;font-size:1rem;color:#ccc}
-.grade-detail-worst{font-size:.6rem;color:#555}
-.grade-detail-stability{font-size:.6rem;letter-spacing:.12em;text-transform:uppercase}
-.grade-detail-mode{font-size:.55rem;letter-spacing:.1em;color:#444;text-transform:uppercase;margin-top:2px}
+.stat-label{font-size:.5rem;color:#555;letter-spacing:.14em;text-transform:uppercase;margin-bottom:4px}
+.stat-value{font-weight:900;font-size:1.2rem}
+.stat-sub{font-size:.6rem;color:#666;margin-top:2px}
+.stat-bar{display:flex;height:5px;border-radius:3px;overflow:hidden;margin-top:6px;background:#1a1a1a}
+.stat-bar-left{height:100%;border-radius:3px 0 0 3px;transition:width .3s}
+.stat-bar-right{height:100%;border-radius:0 3px 3px 0;opacity:.4;transition:width .3s}
+.stats-mode{
+  text-align:center;font-size:.55rem;color:#444;letter-spacing:.14em;text-transform:uppercase;
+  margin-bottom:10px;
+}
+.results-actions{display:flex;gap:10px}
+.results-actions .btn-primary,.results-actions .btn-secondary{flex:1;text-align:center;padding:14px 16px}
 
-/* History section in drawer */
-#history-panel{margin-top:8px}
-.hist-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.hist-header span{font-size:.55rem;color:#444;letter-spacing:.18em;text-transform:uppercase;font-family:'Inter',sans-serif}
-.hist-clear{font-size:.55rem;color:#555;background:none;border:1px solid #333;padding:2px 6px;border-radius:2px;cursor:pointer;font-family:'Inter',sans-serif}
-.hist-entry{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.65rem;background:rgba(255,255,255,.02);border-radius:6px;margin-bottom:3px}
-.hist-entry:last-child{border-bottom:none}
-.hist-time{color:#555}
-.hist-grade{font-family:'Inter',sans-serif;font-weight:900;font-size:.9rem}
-.hist-ratios{color:#888}
-.hist-empty{padding:16px;text-align:center;color:#333;font-size:.65rem}
+/* Detection failed state */
+.result-failed{
+  position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:14px;text-align:center;padding:32px;height:100%;
+}
+.result-failed-icon{font-size:2.5rem;opacity:.5}
+.result-failed-title{font-weight:700;font-size:1rem;color:#aaa}
+.result-failed-sub{font-size:.75rem;color:#555;max-width:260px;line-height:1.6}
 
 /* ============================================================
-   MICRO-ANIMATION KEYFRAMES & INTERACTION STYLES
+   TRANSITIONS
    ============================================================ */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.fade-in{animation:fadeIn .3s ease both}
+.slide-up{animation:slideUp .35s cubic-bezier(.25,.46,.45,.94) both}
 
-/* History entries slide in from right */
-.hist-entry{animation:histSlideIn .35s cubic-bezier(.25,.46,.45,.94) both}
-@keyframes histSlideIn{from{transform:translateX(30px);opacity:0}to{transform:translateX(0);opacity:1}}
-
-/* Lock button pulse */
-@keyframes lockPulse{
-  0%{transform:scale(1);box-shadow:none}
-  30%{transform:scale(1.12);box-shadow:0 0 14px rgba(52,211,153,.35)}
-  100%{transform:scale(1);box-shadow:0 0 0 rgba(52,211,153,0)}
-}
-#lock-btn.locked{animation:lockPulse .5s cubic-bezier(.34,1.56,.64,1)}
-
-/* Grade value morph when value changes */
-@keyframes gradeMorph{
-  0%{transform:scale(1);opacity:1}
-  25%{transform:scale(.65) translateY(4px);opacity:.2}
-  60%{transform:scale(1.15) translateY(-2px);opacity:1}
-  100%{transform:scale(1) translateY(0);opacity:1}
-}
-.grade-morph{animation:gradeMorph .4s cubic-bezier(.34,1.56,.64,1)!important}
-
-/* HUD elements fade-in on first card detect */
-@keyframes hudFadeIn{
-  from{opacity:0;transform:translateY(12px)}
-  to{opacity:1;transform:translateY(0)}
-}
-#hud-badge.entering{animation:hudFadeIn .45s cubic-bezier(.25,.46,.45,.94) both}
-#hud-ratios.entering{animation:hudFadeIn .45s cubic-bezier(.25,.46,.45,.94) .08s both}
-#controls.entering{animation:hudFadeIn .4s cubic-bezier(.25,.46,.45,.94) .12s both}
-
-/* Mode badge pop on mode transition */
-@keyframes badgePop{0%{transform:scale(1)}40%{transform:scale(1.2)}100%{transform:scale(1)}}
-#mode-badge.pop{animation:badgePop .35s cubic-bezier(.34,1.56,.64,1)}
-
-/* Shutter snap — camera iris close/open + white flash */
-@keyframes shutterSnap{
-  0%{opacity:0;background:transparent}
-  10%{opacity:1;background:linear-gradient(180deg,#000 0%,#000 44%,transparent 44.5%,transparent 55.5%,#000 56%,#000 100%)}
-  20%{opacity:1;background:#000}
-  35%{opacity:.85;background:#fff}
-  50%{opacity:.4;background:#fff}
-  100%{opacity:0;background:transparent}
-}
-#flash-overlay.shutter{animation:shutterSnap .42s cubic-bezier(.22,1,.36,1) forwards}
-
-/* Overlay canvas fade-in */
-@keyframes overlayFadeIn{from{opacity:0}to{opacity:1}}
-canvas#overlay.fade-in{animation:overlayFadeIn .35s ease both}
-
-/* Long-press ring */
-#longpress-ring{
-  position:absolute;width:52px;height:52px;pointer-events:none;z-index:13;
-  opacity:0;transition:opacity .12s ease;
-}
-#longpress-ring svg{width:52px;height:52px;transform:rotate(-90deg)}
-#longpress-ring circle{fill:none;stroke-width:3;stroke-linecap:round}
-#longpress-ring .lp-bg{stroke:rgba(255,255,255,.08)}
-#longpress-ring .lp-fill{stroke:var(--yellow);stroke-dasharray:144.51;stroke-dashoffset:144.51;transition:none}
-#longpress-ring.active{opacity:1}
-#longpress-ring.active .lp-fill{transition:stroke-dashoffset .55s linear;stroke-dashoffset:0}
-#longpress-ring.fired .lp-fill{stroke:var(--green);stroke-dashoffset:0}
-
-/* Drawer physics — disable transition when dragging */
-#drawer{touch-action:none}
-#drawer.dragging{transition:none!important}
-
-/* Celebratory sparkle on grade improvement */
-@keyframes sparkle{
-  0%{box-shadow:0 0 0 0 rgba(52,211,153,.4)}
-  50%{box-shadow:0 0 30px 8px rgba(52,211,153,.15)}
-  100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}
-}
-.grade-detail-card.sparkle{animation:sparkle .6s ease}
-
-/* Lock overlay border solidify effect (drawn on canvas, CSS for button) */
-.ctrl-btn:active{transform:scale(.93);opacity:.75}
-#lock-btn{transition:all .25s cubic-bezier(.25,.46,.45,.94)}
+/* ============================================================
+   UTILITY
+   ============================================================ */
+canvas#proc{display:none}
 </style>
 </head>
 <body>
 
-<header>
-  <h1>&#x2B1B; Centering Cam</h1>
-  <div class="header-right">
-    <span id="mode-badge" style="background:#333;color:#888">FRAME</span>
-    <span id="ready-dot">&#x25CF; READY</span>
+<!-- ===== START SCREEN ===== -->
+<div class="screen active" id="screen-start">
+  <div class="start-icon">&#x1F4F7;</div>
+  <div class="start-title">Centering Cam</div>
+  <p class="start-sub">Capture or upload a photo of your Pokemon card to analyze centering and estimate PSA grade.</p>
+  <div class="start-actions">
+    <button class="btn-primary" id="start-camera-btn">Start Camera</button>
+    <button class="btn-secondary" id="start-upload-btn">&#128206; Upload Photo</button>
   </div>
-</header>
+  <div class="start-tip">Works best on dark backgrounds with good lighting</div>
+  <input type="file" id="file-input-start" accept="image/*" style="display:none">
+</div>
 
-<div id="cam-wrap">
-  <video id="video" autoplay playsinline muted></video>
-  <canvas id="overlay"></canvas>
-  <canvas id="proc"></canvas>
-  <div id="flash-overlay"></div>
+<!-- ===== CAMERA SCREEN ===== -->
+<div class="screen" id="screen-camera">
+  <div id="cam-wrap">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="guide-overlay"></canvas>
+    <canvas id="proc"></canvas>
 
-  <!-- Long-press feedback ring -->
-  <div id="longpress-ring">
-    <svg viewBox="0 0 52 52">
-      <circle class="lp-bg" cx="26" cy="26" r="23"/>
-      <circle class="lp-fill" cx="26" cy="26" r="23"/>
-    </svg>
-  </div>
-
-  <div id="controls">
-    <button class="ctrl-btn" id="flip-btn" aria-label="Flip camera">&#x1F504;</button>
-    <button class="ctrl-btn" id="torch-btn" style="display:none" aria-label="Toggle light">&#x1F526;</button>
-    <button class="ctrl-btn" id="lock-btn" aria-label="Lock">&#x1F512;</button>
-    <button class="ctrl-btn" id="snap-btn" aria-label="Snapshot">&#x1F4F7;</button>
-    <button class="ctrl-btn" id="auto-btn" class="active" aria-label="Auto" style="display:none">&#x27F3;</button>
-    <button class="ctrl-btn" id="hist-btn" style="display:none">&#x1F4CB;</button>
-  </div>
-
-  <div id="status-bar">Searching &mdash; place card on dark surface</div>
-
-  <!-- ===== FLOATING HUD GRADE BADGE (bottom-left) ===== -->
-  <div id="hud-badge">
-    <div class="stability-ring-wrap">
-      <svg viewBox="0 0 64 64">
-        <circle class="stability-ring-bg" cx="32" cy="32" r="28"/>
-        <circle class="stability-ring-fill" id="stability-ring" cx="32" cy="32" r="28"
-          stroke-dasharray="175.93" stroke-dashoffset="175.93"/>
-      </svg>
-      <div class="grade-center">
-        <div class="grade-num" id="hud-grade-num">&mdash;</div>
-        <div class="grade-psa">PSA</div>
+    <!-- Top bar: flip, torch -->
+    <div class="cam-top-bar">
+      <div class="cam-top-left">
+        <button class="cam-btn" id="flip-btn" aria-label="Flip camera">&#x1F504;</button>
+        <button class="cam-btn" id="torch-btn" aria-label="Toggle light" style="display:none">&#x1F526;</button>
+      </div>
+      <div class="cam-top-right">
+        <!-- intentionally empty for balance -->
       </div>
     </div>
-    <div class="hud-info">
-      <div class="hud-desc" id="hud-desc">Point at card</div>
-      <div class="hud-stability" id="hud-stability">&nbsp;</div>
-      <div class="hud-mode" id="hud-mode-label">FRAME</div>
+
+    <!-- Bottom: capture button -->
+    <div class="cam-bottom-bar">
+      <button id="capture-btn" aria-label="Capture photo"></button>
+    </div>
+
+    <!-- Bottom side buttons: upload & placeholder -->
+    <div class="cam-bottom-side">
+      <button class="cam-btn" id="gallery-btn" aria-label="Upload from gallery">&#x1F5BC;</button>
+      <div style="width:42px"></div><!-- spacer -->
+    </div>
+
+    <input type="file" id="file-input" accept="image/*">
+  </div>
+</div>
+
+<!-- ===== ANALYZING SCREEN ===== -->
+<div class="screen" id="screen-analyzing">
+  <canvas id="frozen-frame"></canvas>
+  <div class="analyzing-overlay">
+    <div class="spinner"></div>
+    <div class="analyzing-text">Analyzing...</div>
+  </div>
+</div>
+
+<!-- ===== RESULTS SCREEN ===== -->
+<div class="screen" id="screen-results">
+  <div class="results-image-wrap" id="results-image-wrap">
+    <canvas id="result-canvas"></canvas>
+    <!-- Grade badge (populated by JS) -->
+    <div class="result-grade-badge" id="result-grade-badge" style="display:none">
+      <div>
+        <div class="result-grade-num" id="result-grade-num">--</div>
+        <div class="result-grade-label">PSA</div>
+      </div>
+      <div class="result-grade-info">
+        <div class="result-grade-desc" id="result-grade-desc">--</div>
+      </div>
+    </div>
+    <!-- Failed state -->
+    <div class="result-failed" id="result-failed" style="display:none">
+      <div class="result-failed-icon">&#x26A0;</div>
+      <div class="result-failed-title">Card Not Detected</div>
+      <div class="result-failed-sub">Try again with better lighting, a darker background, or make sure the full card is visible in the frame.</div>
     </div>
   </div>
-
-  <!-- ===== FLOATING RATIO GAUGES (bottom-right) ===== -->
-  <div id="hud-ratios">
-    <div class="ratio-gauge" id="lr-gauge">
-      <svg viewBox="0 0 44 44">
-        <circle class="ratio-arc-bg" cx="22" cy="22" r="18"/>
-        <circle class="ratio-arc-left" id="lr-arc-left" cx="22" cy="22" r="18"
-          stroke="var(--orange)" stroke-dasharray="113.1" stroke-dashoffset="56.55"/>
-        <circle class="ratio-arc-right" id="lr-arc-right" cx="22" cy="22" r="18"
-          stroke="var(--orange)" stroke-dasharray="113.1" stroke-dashoffset="56.55"
-          transform="rotate(180 22 22)"/>
-        <text class="ratio-center-text" x="22" y="22" transform="rotate(90 22 22)" id="lr-ratio-text">&mdash;</text>
-      </svg>
-      <div class="ratio-label">L / R</div>
-      <div class="ratio-pct" id="lr-pct">&mdash;</div>
-    </div>
-    <div class="ratio-gauge" id="tb-gauge">
-      <svg viewBox="0 0 44 44">
-        <circle class="ratio-arc-bg" cx="22" cy="22" r="18"/>
-        <circle class="ratio-arc-left" id="tb-arc-left" cx="22" cy="22" r="18"
-          stroke="var(--cyan)" stroke-dasharray="113.1" stroke-dashoffset="56.55"/>
-        <circle class="ratio-arc-right" id="tb-arc-right" cx="22" cy="22" r="18"
-          stroke="var(--cyan)" stroke-dasharray="113.1" stroke-dashoffset="56.55"
-          transform="rotate(180 22 22)"/>
-        <text class="ratio-center-text" x="22" y="22" transform="rotate(90 22 22)" id="tb-ratio-text">&mdash;</text>
-      </svg>
-      <div class="ratio-label">T / B</div>
-      <div class="ratio-pct" id="tb-pct">&mdash;</div>
-    </div>
-  </div>
-
-  <!-- ===== SWIPE-UP DETAILS DRAWER ===== -->
-  <div id="drawer">
-    <div class="drawer-handle" id="drawer-handle">
-      <div class="drawer-handle-bar"></div>
-    </div>
-    <div class="drawer-peek" id="drawer-peek">
-      <span>Details</span>
-      <span class="drawer-peek-grade" id="drawer-peek-grade">&mdash;</span>
-      <span>&#x25B2;</span>
-    </div>
-    <div class="drawer-content">
-      <!-- Grade detail card -->
-      <div class="drawer-section">
-        <div class="grade-detail-card" id="grade-detail-card">
-          <div class="grade-detail-ring">
-            <svg viewBox="0 0 72 72">
-              <circle class="stability-ring-bg" cx="36" cy="36" r="31"/>
-              <circle class="stability-ring-fill" id="stability-ring-detail" cx="36" cy="36" r="31"
-                stroke-dasharray="194.78" stroke-dashoffset="194.78"/>
-            </svg>
-            <div class="grade-detail-center">
-              <div class="grade-num" id="drawer-grade-num">&mdash;</div>
-              <div class="grade-psa">PSA</div>
-            </div>
-          </div>
-          <div class="grade-detail-info">
-            <div class="grade-detail-desc" id="drawer-grade-desc">Point camera at card</div>
-            <div class="grade-detail-worst" id="drawer-worst">Worst axis: &mdash;</div>
-            <div class="grade-detail-stability" id="drawer-stability">&nbsp;</div>
-            <div class="grade-detail-mode" id="drawer-mode">FRAME MODE</div>
-          </div>
+  <div class="results-stats" id="results-stats" style="display:none">
+    <div class="stats-mode" id="stats-mode">BORDER MODE</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">&#x25C0; Left / Right &#x25B6;</div>
+        <div class="stat-value" id="stat-lr-val" style="color:var(--orange)">--</div>
+        <div class="stat-sub" id="stat-lr-ratio">--</div>
+        <div class="stat-bar">
+          <div class="stat-bar-left" id="stat-lr-bar-l" style="background:var(--orange);width:50%"></div>
+          <div class="stat-bar-right" id="stat-lr-bar-r" style="background:var(--orange);width:50%"></div>
         </div>
       </div>
-
-      <!-- LR detail -->
-      <div class="drawer-section">
-        <div class="drawer-section-title" id="lr-section-title">&#x25C0; Left / Right &#x25B6;</div>
-        <div class="detail-stat">
-          <div class="detail-stat-left">
-            <div class="detail-stat-label">Distribution</div>
-            <div class="detail-stat-value" id="lr-val" style="color:var(--orange)">&mdash;</div>
-          </div>
-          <div class="detail-stat-right">
-            <div class="detail-stat-ratio" id="lr-ratio">&mdash;</div>
-            <div class="detail-stat-pct">ratio</div>
-          </div>
-        </div>
-        <div class="split-bar">
-          <div class="split-bar-left" id="lr-bar-left" style="background:var(--orange);width:50%"></div>
-          <div class="split-bar-right" id="lr-bar-right" style="background:var(--orange);width:50%"></div>
-        </div>
-      </div>
-
-      <!-- TB detail -->
-      <div class="drawer-section">
-        <div class="drawer-section-title" id="tb-section-title">&#x25B2; Top / Bottom &#x25BC;</div>
-        <div class="detail-stat">
-          <div class="detail-stat-left">
-            <div class="detail-stat-label">Distribution</div>
-            <div class="detail-stat-value" id="tb-val" style="color:var(--cyan)">&mdash;</div>
-          </div>
-          <div class="detail-stat-right">
-            <div class="detail-stat-ratio" id="tb-ratio">&mdash;</div>
-            <div class="detail-stat-pct">ratio</div>
-          </div>
-        </div>
-        <div class="split-bar">
-          <div class="split-bar-left" id="tb-bar-left" style="background:var(--cyan);width:50%"></div>
-          <div class="split-bar-right" id="tb-bar-right" style="background:var(--cyan);width:50%"></div>
-        </div>
-      </div>
-
-      <!-- History -->
-      <div class="drawer-section">
-        <div id="history-panel">
-          <div class="hist-header">
-            <span>Scan History</span>
-            <button class="hist-clear" id="hist-clear">Clear</button>
-          </div>
-          <div id="hist-list"><div class="hist-empty">No scans yet</div></div>
+      <div class="stat-card">
+        <div class="stat-label">&#x25B2; Top / Bottom &#x25BC;</div>
+        <div class="stat-value" id="stat-tb-val" style="color:var(--cyan)">--</div>
+        <div class="stat-sub" id="stat-tb-ratio">--</div>
+        <div class="stat-bar">
+          <div class="stat-bar-left" id="stat-tb-bar-l" style="background:var(--cyan);width:50%"></div>
+          <div class="stat-bar-right" id="stat-tb-bar-r" style="background:var(--cyan);width:50%"></div>
         </div>
       </div>
     </div>
+    <div class="results-actions">
+      <button class="btn-secondary" id="retake-btn">&#x1F504; Retake</button>
+      <button class="btn-primary" id="save-btn">&#x1F4BE; Save</button>
+    </div>
   </div>
-
-  <div id="start-msg">
-    <h2>Centering Cam</h2>
-    <p>Point your camera at a Pok&eacute;mon card. Detects outer edges and inner print borders to estimate PSA centering grade.</p>
-    <button id="start-btn">Start Camera</button>
-    <div id="tip">Works on any surface &mdash; dark backgrounds give best results</div>
+  <!-- Actions shown when detection fails -->
+  <div class="results-stats" id="results-failed-actions" style="display:none">
+    <div class="results-actions">
+      <button class="btn-primary" id="retake-failed-btn" style="width:100%">&#x1F504; Try Again</button>
+    </div>
   </div>
 </div>
 
 
 <script>
+// ================================================================
+// WEB WORKER — detection pipeline (Sobel, Otsu, corners, homography, inner borders)
+// ================================================================
 const workerCode = `
 'use strict';
 
@@ -526,7 +386,6 @@ function fitLine(points) {
   for (const p of points) { sx += p.x; sy += p.y; sxx += p.x*p.x; sxy += p.x*p.y; }
   const denom = n * sxx - sx * sx;
   if (Math.abs(denom) < 1e-10) {
-    // Vertical line
     return { vertical: true, x: sx / n };
   }
   const m = (n * sxy - sx * sy) / denom;
@@ -534,16 +393,12 @@ function fitLine(points) {
   return { vertical: false, m, b };
 }
 
-// Fit line to points, but try both x=f(y) and y=f(x) and pick better fit
 function fitLineBest(points) {
   if (points.length < 2) return null;
-  // y = mx + b
   const lineYX = fitLine(points);
-  // x = my + b (swap coords)
   const swapped = points.map(p => ({x: p.y, y: p.x}));
   const lineXY = fitLine(swapped);
 
-  // Compute residuals for each
   let resYX = 0, resXY = 0;
   for (const p of points) {
     if (lineYX && !lineYX.vertical) {
@@ -557,16 +412,13 @@ function fitLineBest(points) {
   }
 
   if (resYX <= resXY && lineYX && !lineYX.vertical) {
-    // y = mx + b  =>  ax + by + c = 0  =>  m, -1, b
     return { a: lineYX.m, b: -1, c: lineYX.b };
   } else if (lineXY && !lineXY.vertical) {
-    // x = my + b  =>  1x + (-m)y + (-b) = 0
     return { a: 1, b: -lineXY.m, c: -lineXY.b };
   }
   return null;
 }
 
-// Intersect two lines ax+by+c=0
 function intersectLines(l1, l2) {
   const det = l1.a * l2.b - l2.a * l1.b;
   if (Math.abs(det) < 1e-10) return null;
@@ -622,7 +474,6 @@ function invertH(H) {
 // --- Warp card to rectangle ---
 function warpCard(pixels, srcW, srcH, corners, dstW, dstH) {
   const dst = new Uint8Array(dstW * dstH * 4);
-  // corners: TL, TR, BR, BL
   const H = computeHomography(
     [{x:0,y:0},{x:dstW,y:0},{x:dstW,y:dstH},{x:0,y:dstH}],
     corners
@@ -653,8 +504,6 @@ function warpCard(pixels, srcW, srcH, corners, dstW, dstH) {
 
 // --- Inner border detection ---
 function detectBorders(warped, w, h) {
-  // For each edge, scan inward looking for color transition
-  // Sample the middle 60% to avoid corners
   const yStart = Math.floor(h * 0.2), yEnd = Math.floor(h * 0.8);
   const xStart = Math.floor(w * 0.2), xEnd = Math.floor(w * 0.8);
 
@@ -671,23 +520,21 @@ function detectBorders(warped, w, h) {
 
   function colorVariance(pixels, indices) {
     if (indices.length < 2) return 0;
-    const avg = avgColor(pixels, indices);
+    const avg2 = avgColor(pixels, indices);
     let v = 0;
     for (const i of indices) {
-      v += (pixels[i]-avg[0])**2 + (pixels[i+1]-avg[1])**2 + (pixels[i+2]-avg[2])**2;
+      v += (pixels[i]-avg2[0])**2 + (pixels[i+1]-avg2[1])**2 + (pixels[i+2]-avg2[2])**2;
     }
     return Math.sqrt(v / indices.length);
   }
 
   function findBorder(getIndices, maxDepth) {
-    // Get edge color (first strip)
     const edgeIdx = getIndices(0);
     if (!edgeIdx.length) return 0;
     const edgeColor = avgColor(warped, edgeIdx);
     const edgeVar = colorVariance(warped, edgeIdx);
 
     let borderWidth = 0;
-    let prevDist = 0;
     const DIST_THRESH = 35;
     const VAR_THRESH = edgeVar + 20;
     let consecutive = 0;
@@ -710,28 +557,24 @@ function detectBorders(warped, w, h) {
     return borderWidth;
   }
 
-  // Left border: scan from x=0 rightward
   const leftW = findBorder((d) => {
     const idx = [];
     for (let y = yStart; y < yEnd; y += 2) idx.push((y*w+d)*4);
     return idx;
   }, Math.floor(w * 0.35));
 
-  // Right border: scan from x=w-1 leftward
   const rightW = findBorder((d) => {
     const idx = [];
     for (let y = yStart; y < yEnd; y += 2) idx.push((y*w+(w-1-d))*4);
     return idx;
   }, Math.floor(w * 0.35));
 
-  // Top border: scan from y=0 downward
   const topW = findBorder((d) => {
     const idx = [];
     for (let x = xStart; x < xEnd; x += 2) idx.push((d*w+x)*4);
     return idx;
   }, Math.floor(h * 0.35));
 
-  // Bottom border: scan from y=h-1 upward
   const bottomW = findBorder((d) => {
     const idx = [];
     for (let x = xStart; x < xEnd; x += 2) idx.push(((h-1-d)*w+x)*4);
@@ -780,7 +623,6 @@ self.onmessage = function(e) {
     colEdge[x] = cnt / (PH-2);
   }
 
-  // Find card edges from projection peaks
   const ROW_T = 0.12, COL_T = 0.12;
   let top = -1, bot = -1, left = -1, right = -1;
   for (let y = 0; y < PH; y++) { if (rowEdge[y] > ROW_T) { if (top < 0) top = y; bot = y; } }
@@ -831,7 +673,6 @@ self.onmessage = function(e) {
     const bl = intersectLines(botLine, leftLine);
 
     if (tl && tr && br && bl) {
-      // Validate corners are reasonable
       const allInBounds = [tl,tr,br,bl].every(p =>
         p.x >= -10 && p.x <= PW+10 && p.y >= -10 && p.y <= PH+10
       );
@@ -848,10 +689,8 @@ self.onmessage = function(e) {
     }
   }
 
-  // Normalize output
   const result = {
     found: true,
-    // Bounding box (normalized)
     left: left / PW, top: top / PH,
     width: cw / PW, height: ch / PH,
     ar,
@@ -870,63 +709,72 @@ self.onmessage = function(e) {
 };
 `;
 
-
-
+// ================================================================
+// INIT WORKER
+// ================================================================
 const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
 const worker = new Worker(URL.createObjectURL(workerBlob));
-let workerBusy = false;
+
+// ================================================================
+// STATE MACHINE
+// ================================================================
+let appState = 'START'; // START | CAMERA | ANALYZING | RESULTS
+let facingMode = 'environment';
+let currentStream = null;
+let torchOn = false;
+let capturedImageData = null; // ImageData from the captured frame
+let capturedPhotoCanvas = null; // canvas with the original captured photo
+let analysisResult = null;
+
+// Processing resolution (higher than before for single-shot analysis)
+const PW = 480, PH = 360;
 
 // ================================================================
 // DOM REFS
 // ================================================================
 const video = document.getElementById('video');
-const overlay = document.getElementById('overlay');
 const proc = document.getElementById('proc');
-const ctx = overlay.getContext('2d');
 const pctx = proc.getContext('2d', { willReadFrequently: true });
-const wrap = document.getElementById('cam-wrap');
-const statusBar = document.getElementById('status-bar');
-const flashEl = document.getElementById('flash-overlay');
-const modeBadge = document.getElementById('mode-badge');
-const drawer = document.getElementById('drawer');
-const drawerHandle = document.getElementById('drawer-handle');
-const drawerPeek = document.getElementById('drawer-peek');
-const lpRing = document.getElementById('longpress-ring');
-
-// ================================================================
-// STATE
-// ================================================================
-let locked = false, lockedCard = null, lockedResult = null;
-let smoothCard = null, lastDetect = 0, lastResult = null;
-let facingMode = 'environment', currentStream = null, torchOn = false;
-let hadCard = false, hudShown = false;
-let prevGrade = null, prevMode = null;
-let overlayAlpha = 0;
-const SMOOTH = 0.15;
-const PW = 240, PH = 180;
 proc.width = PW; proc.height = PH;
 
-const STABILITY_SIZE = 12;
-const stabilityBuf = [];
-let stabilityState = 'MOVING';
-const STABILITY_PERCENT = { MOVING: 0.25, ADJUSTING: 0.5, SETTLING: 0.75, STABLE: 1.0 };
-const STABILITY_COLORS = { MOVING: '#f87171', ADJUSTING: '#fb923c', SETTLING: '#fbbf24', STABLE: '#34d399' };
+const guideOverlay = document.getElementById('guide-overlay');
+const guideCtx = guideOverlay.getContext('2d');
 
-let history = JSON.parse(localStorage.getItem('cc_history') || '[]');
+const frozenFrame = document.getElementById('frozen-frame');
+const frozenCtx = frozenFrame.getContext('2d');
 
-function lerp(a, b, t) { return a + (b - a) * t; }
+const resultCanvas = document.getElementById('result-canvas');
+const resultCtx = resultCanvas.getContext('2d');
 
 // ================================================================
-// HAPTIC PATTERNS — distinct vibration signatures per action
+// SCREEN TRANSITIONS
 // ================================================================
-function vibrate(p) { if (navigator.vibrate) navigator.vibrate(p); }
-const HAPTIC = {
-  detect:   () => vibrate(25),                    // single short pulse
-  lock:     () => vibrate([30, 20, 30]),           // double pulse (confirm)
-  unlock:   () => vibrate(15),                     // light tap
-  snapshot: () => vibrate(50),                     // strong single pulse
-  gradeUp:  () => vibrate([20, 15, 20, 15, 20]),   // celebratory triple pulse
-};
+function switchScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById('screen-' + name.toLowerCase());
+  if (target) {
+    target.classList.add('active');
+    // Add fade-in class
+    target.classList.remove('fade-in');
+    void target.offsetWidth;
+    target.classList.add('fade-in');
+  }
+  appState = name;
+}
+
+// ================================================================
+// START SCREEN HANDLERS
+// ================================================================
+document.getElementById('start-camera-btn').addEventListener('click', async () => {
+  switchScreen('CAMERA');
+  await startCamera();
+});
+
+document.getElementById('start-upload-btn').addEventListener('click', () => {
+  document.getElementById('file-input-start').click();
+});
+
+document.getElementById('file-input-start').addEventListener('change', handleFileUpload);
 
 // ================================================================
 // CAMERA
@@ -935,186 +783,507 @@ async function startCamera() {
   if (currentStream) currentStream.getTracks().forEach(t => t.stop());
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: facingMode }, width: { ideal: 1920 } }
+      video: { facingMode: { ideal: facingMode }, width: { ideal: 1920 }, height: { ideal: 1080 } }
     });
     currentStream = stream;
     video.srcObject = stream;
-    document.getElementById('start-msg').style.display = 'none';
-    resizeCanvas();
+    resizeGuideOverlay();
+    requestAnimationFrame(drawGuide);
+    // Check torch capability
     const track = stream.getVideoTracks()[0];
     const caps = track.getCapabilities ? track.getCapabilities() : {};
     document.getElementById('torch-btn').style.display = caps.torch ? '' : 'none';
     if (!caps.torch) torchOn = false;
-    requestAnimationFrame(loop);
   } catch (e) {
-    document.getElementById('start-msg').innerHTML =
-      '<h2 style="color:var(--red)">Camera Error</h2><p>' + e.message + '</p>' +
-      '<p style="margin-top:10px;color:#555;font-size:.65rem">Open in your browser directly.</p>';
-  }
-}
-document.getElementById('start-btn').addEventListener('click', startCamera);
-
-// ================================================================
-// GESTURE SYSTEM
-// ================================================================
-
-// --- Double-tap to lock/unlock (320ms window) ---
-let lastTapTime = 0;
-const DOUBLE_TAP_THRESHOLD = 320;
-
-// --- Long-press to snapshot (550ms hold) ---
-let lpTimeout = null, lpActive = false;
-const LP_DURATION = 550;
-
-// --- Drawer swipe state ---
-let drawerOpen = false, drawerDragY = null, drawerBaseTranslate = 0;
-
-function handleCamTapStart(e) {
-  if (e.target.closest('#controls') || e.target.closest('#start-msg') ||
-      e.target.closest('#drawer') || e.target.closest('#hud-badge') ||
-      e.target.closest('#hud-ratios')) return;
-
-  const touch = e.touches ? e.touches[0] : e;
-  const now = Date.now();
-  const tx = touch.clientX, ty = touch.clientY;
-  const wrapRect = wrap.getBoundingClientRect();
-
-  // Check double-tap first
-  if (now - lastTapTime < DOUBLE_TAP_THRESHOLD) {
-    clearTimeout(lpTimeout);
-    lpRing.style.opacity = '0';
-    lpRing.classList.remove('active');
-    toggleLock();
-    lastTapTime = 0;
-    if (e.preventDefault) e.preventDefault();
-    return;
-  }
-  lastTapTime = now;
-
-  // Start long-press timer
-  lpActive = false;
-  lpTimeout = setTimeout(() => {
-    lpActive = true;
-    doSnapshot();
-    lpRing.classList.remove('active');
-    lpRing.classList.add('fired');
-    setTimeout(() => { lpRing.style.opacity = '0'; lpRing.classList.remove('fired'); }, 300);
-  }, LP_DURATION);
-
-  // Show long-press feedback ring
-  lpRing.style.left = (tx - wrapRect.left - 26) + 'px';
-  lpRing.style.top = (ty - wrapRect.top - 26) + 'px';
-  lpRing.classList.remove('fired');
-  const fillCircle = lpRing.querySelector('.lp-fill');
-  fillCircle.style.transition = 'none';
-  fillCircle.style.strokeDashoffset = '144.51';
-  void fillCircle.offsetWidth; // force reflow
-  lpRing.classList.add('active');
-  fillCircle.style.transition = 'stroke-dashoffset ' + (LP_DURATION / 1000) + 's linear';
-  fillCircle.style.strokeDashoffset = '0';
-}
-
-function handleCamTapEnd() {
-  clearTimeout(lpTimeout);
-  if (!lpActive) {
-    lpRing.classList.remove('active');
-    lpRing.style.opacity = '0';
-    const fillCircle = lpRing.querySelector('.lp-fill');
-    fillCircle.style.transition = 'none';
-    fillCircle.style.strokeDashoffset = '144.51';
+    switchScreen('START');
+    alert('Camera error: ' + e.message);
   }
 }
 
-function handleCamTapMove() {
-  if (lpTimeout) {
-    clearTimeout(lpTimeout);
-    lpRing.classList.remove('active');
-    lpRing.style.opacity = '0';
+function stopCamera() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(t => t.stop());
+    currentStream = null;
   }
 }
 
-wrap.addEventListener('touchstart', handleCamTapStart, { passive: false });
-wrap.addEventListener('touchend', handleCamTapEnd, { passive: true });
-wrap.addEventListener('touchmove', handleCamTapMove, { passive: true });
-wrap.addEventListener('mousedown', (e) => {
-  if (e.target.closest('#controls') || e.target.closest('#start-msg') ||
-      e.target.closest('#drawer') || e.target.closest('#hud-badge') ||
-      e.target.closest('#hud-ratios')) return;
-  handleCamTapStart(e);
-});
-wrap.addEventListener('mouseup', handleCamTapEnd);
-
-// --- Drawer swipe-up/down gestures ---
-function getDrawerFullHeight() {
-  return Math.min(drawer.scrollHeight, wrap.clientHeight * 0.7);
+function resizeGuideOverlay() {
+  const wrap = document.getElementById('cam-wrap');
+  guideOverlay.width = wrap.clientWidth;
+  guideOverlay.height = wrap.clientHeight;
 }
-
-drawerHandle.addEventListener('touchstart', (e) => {
-  drawerDragY = e.touches[0].clientY;
-  const cStyle = getComputedStyle(drawer).transform;
-  const match = cStyle.match(/matrix.*,\s*([^)]+)\)$/);
-  drawerBaseTranslate = match ? parseFloat(match[1]) : (drawerOpen ? 0 : getDrawerFullHeight() - 44);
-  drawer.classList.add('dragging');
-  e.preventDefault();
-}, { passive: false });
-
-drawerHandle.addEventListener('touchmove', (e) => {
-  if (drawerDragY === null) return;
-  const dy = e.touches[0].clientY - drawerDragY;
-  const full = getDrawerFullHeight();
-  const peekH = 44;
-  const clamped = Math.max(0, Math.min(full - peekH, drawerBaseTranslate + dy));
-  drawer.style.transform = 'translateY(' + clamped + 'px)';
-  e.preventDefault();
-}, { passive: false });
-
-drawerHandle.addEventListener('touchend', () => {
-  if (drawerDragY === null) return;
-  drawer.classList.remove('dragging');
-  const raw = drawer.style.transform.match(/-?[\d.]+/);
-  const currentY = raw ? parseFloat(raw[0]) : 0;
-  const threshold = (getDrawerFullHeight() - 44) / 2;
-  if (currentY < threshold) openDrawer(); else closeDrawer();
-  drawerDragY = null;
+window.addEventListener('resize', () => {
+  if (appState === 'CAMERA') resizeGuideOverlay();
 });
 
-drawerPeek.addEventListener('click', () => { if (drawerOpen) closeDrawer(); else openDrawer(); });
-drawerHandle.addEventListener('click', () => { if (drawerOpen) closeDrawer(); else openDrawer(); });
+// ================================================================
+// CAMERA GUIDE OVERLAY — dashed card outline, no detection
+// ================================================================
+function drawGuide() {
+  if (appState !== 'CAMERA') return;
+  requestAnimationFrame(drawGuide);
 
-function openDrawer() {
-  drawerOpen = true;
-  drawer.classList.remove('dragging');
-  drawer.classList.add('open');
-  drawer.style.transform = 'translateY(0)';
-}
-function closeDrawer() {
-  drawerOpen = false;
-  drawer.classList.remove('dragging');
-  drawer.classList.remove('open');
-  drawer.style.transform = 'translateY(calc(100% - 44px))';
+  const W = guideOverlay.width, H = guideOverlay.height;
+  guideCtx.clearRect(0, 0, W, H);
+
+  // Card guide rectangle (standard card aspect ratio ~2.5x3.5 = 0.714)
+  const cardAR = 0.714;
+  let gw, gh;
+  if (W / H < cardAR) {
+    gw = W * 0.7;
+    gh = gw / cardAR;
+  } else {
+    gh = H * 0.7;
+    gw = gh * cardAR;
+  }
+  const gx = (W - gw) / 2;
+  const gy = (H - gh) / 2;
+  const r = Math.min(gw, gh) * 0.04;
+
+  // Dashed card outline
+  guideCtx.strokeStyle = 'rgba(255,255,255,0.25)';
+  guideCtx.lineWidth = 1.5;
+  guideCtx.setLineDash([10, 8]);
+  roundRect(guideCtx, gx, gy, gw, gh, r);
+  guideCtx.stroke();
+  guideCtx.setLineDash([]);
+
+  // Corner brackets (brighter)
+  const bLen = Math.min(28, gw * 0.1);
+  guideCtx.strokeStyle = 'rgba(255,255,255,0.45)';
+  guideCtx.lineWidth = 2.5;
+  guideCtx.lineCap = 'round';
+  [[gx, gy, 1, 1], [gx + gw, gy, -1, 1], [gx, gy + gh, 1, -1], [gx + gw, gy + gh, -1, -1]].forEach(([px, py, dx, dy]) => {
+    guideCtx.beginPath(); guideCtx.moveTo(px, py); guideCtx.lineTo(px + dx * bLen, py); guideCtx.stroke();
+    guideCtx.beginPath(); guideCtx.moveTo(px, py); guideCtx.lineTo(px, py + dy * bLen); guideCtx.stroke();
+  });
+  guideCtx.lineCap = 'butt';
+
+  // Instruction text
+  guideCtx.fillStyle = 'rgba(255,255,255,0.35)';
+  guideCtx.font = '500 12px "Inter",system-ui,sans-serif';
+  guideCtx.textAlign = 'center';
+  guideCtx.fillText('Position card in frame', W / 2, gy - 12);
 }
 
-// --- Pinch to zoom camera ---
+// ================================================================
+// CAPTURE — grab frame from video at full resolution
+// ================================================================
+function captureFrame() {
+  if (video.readyState < 2) return;
+  // Haptic feedback
+  if (navigator.vibrate) navigator.vibrate(40);
+
+  // Get video native resolution
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 480;
+
+  // Create a full-res canvas with the captured photo
+  capturedPhotoCanvas = document.createElement('canvas');
+  capturedPhotoCanvas.width = vw;
+  capturedPhotoCanvas.height = vh;
+  const cctx = capturedPhotoCanvas.getContext('2d');
+  cctx.drawImage(video, 0, 0, vw, vh);
+
+  // Show frozen frame on analyzing screen
+  frozenFrame.width = vw;
+  frozenFrame.height = vh;
+  frozenCtx.drawImage(capturedPhotoCanvas, 0, 0);
+
+  // Switch to analyzing state
+  switchScreen('ANALYZING');
+
+  // Draw into processing canvas at detection resolution
+  pctx.drawImage(capturedPhotoCanvas, 0, 0, PW, PH);
+  const imgData = pctx.getImageData(0, 0, PW, PH);
+  capturedImageData = imgData;
+
+  // Send to worker
+  worker.postMessage({ data: imgData.data, width: PW, height: PH });
+}
+
+// ================================================================
+// FILE UPLOAD — analyze an existing photo
+// ================================================================
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = ''; // reset so same file can be re-selected
+
+  const img = new Image();
+  img.onload = () => {
+    const vw = img.naturalWidth;
+    const vh = img.naturalHeight;
+
+    capturedPhotoCanvas = document.createElement('canvas');
+    capturedPhotoCanvas.width = vw;
+    capturedPhotoCanvas.height = vh;
+    const cctx = capturedPhotoCanvas.getContext('2d');
+    cctx.drawImage(img, 0, 0, vw, vh);
+
+    frozenFrame.width = vw;
+    frozenFrame.height = vh;
+    frozenCtx.drawImage(capturedPhotoCanvas, 0, 0);
+
+    switchScreen('ANALYZING');
+
+    pctx.drawImage(capturedPhotoCanvas, 0, 0, PW, PH);
+    const imgData = pctx.getImageData(0, 0, PW, PH);
+    capturedImageData = imgData;
+
+    worker.postMessage({ data: imgData.data, width: PW, height: PH });
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+// ================================================================
+// WORKER RESPONSE — show results
+// ================================================================
+worker.onmessage = function(e) {
+  analysisResult = e.data;
+
+  if (!analysisResult.found) {
+    showResultsFailed();
+  } else {
+    showResultsSuccess(analysisResult);
+  }
+};
+
+// ================================================================
+// RESULTS — FAILED
+// ================================================================
+function showResultsFailed() {
+  switchScreen('RESULTS');
+
+  // Show the captured photo dimmed behind the failure message
+  const photo = capturedPhotoCanvas;
+  resultCanvas.width = photo.width;
+  resultCanvas.height = photo.height;
+  resultCtx.drawImage(photo, 0, 0);
+  resultCtx.fillStyle = 'rgba(0,0,0,0.7)';
+  resultCtx.fillRect(0, 0, photo.width, photo.height);
+
+  document.getElementById('result-grade-badge').style.display = 'none';
+  document.getElementById('result-failed').style.display = 'flex';
+  document.getElementById('results-stats').style.display = 'none';
+  document.getElementById('results-failed-actions').style.display = 'block';
+}
+
+// ================================================================
+// RESULTS — SUCCESS
+// ================================================================
+function showResultsSuccess(res) {
+  switchScreen('RESULTS');
+
+  document.getElementById('result-failed').style.display = 'none';
+  document.getElementById('results-failed-actions').style.display = 'none';
+
+  const photo = capturedPhotoCanvas;
+  const W = photo.width, H = photo.height;
+
+  // Draw result canvas: photo + overlay
+  resultCanvas.width = W;
+  resultCanvas.height = H;
+  resultCtx.drawImage(photo, 0, 0);
+
+  // Compute card rect in photo coords
+  const cardX = res.left * W;
+  const cardY = res.top * H;
+  const cardW = res.width * W;
+  const cardH = res.height * H;
+
+  // Compute grade
+  const borderMode = res.borderMode && res.borders;
+  let lrR, tbR, lrPct, tbPct, barLeftPct, barTopPct;
+
+  if (borderMode) {
+    const b = res.borders;
+    lrR = Math.min(b.left, b.right) > 0 ? Math.max(b.left, b.right) / Math.min(b.left, b.right) : 99;
+    tbR = Math.min(b.top, b.bottom) > 0 ? Math.max(b.top, b.bottom) / Math.min(b.top, b.bottom) : 99;
+    const lrT = b.left + b.right, tbT = b.top + b.bottom;
+    lrPct = lrT ? Math.round(b.left / lrT * 100) + '/' + Math.round(b.right / lrT * 100) : '--';
+    tbPct = tbT ? Math.round(b.top / tbT * 100) + '/' + Math.round(b.bottom / tbT * 100) : '--';
+    barLeftPct = lrT ? (b.left / lrT * 100) : 50;
+    barTopPct = tbT ? (b.top / tbT * 100) : 50;
+  } else {
+    const lB = cardX, rB = W - (cardX + cardW), tB = cardY, bB = H - (cardY + cardH);
+    lrR = Math.min(lB, rB) > 2 ? Math.max(lB, rB) / Math.min(lB, rB) : 99;
+    tbR = Math.min(tB, bB) > 2 ? Math.max(tB, bB) / Math.min(tB, bB) : 99;
+    const lrT = lB + rB, tbT = tB + bB;
+    lrPct = lrT ? Math.round(lB / lrT * 100) + '/' + Math.round(rB / lrT * 100) : '--';
+    tbPct = tbT ? Math.round(tB / tbT * 100) + '/' + Math.round(bB / tbT * 100) : '--';
+    barLeftPct = lrT ? (lB / lrT * 100) : 50;
+    barTopPct = tbT ? (tB / tbT * 100) : 50;
+  }
+
+  const worst = Math.max(lrR, tbR);
+  let grade, gradeColor, gradeDesc;
+  if (worst <= 1.22) { grade = '10'; gradeColor = '#34d399'; gradeDesc = 'Gem Mint centering'; }
+  else if (worst <= 1.50) { grade = '9'; gradeColor = '#a3e635'; gradeDesc = 'Strong PSA 9'; }
+  else if (worst <= 1.86) { grade = '8'; gradeColor = '#fbbf24'; gradeDesc = 'Likely PSA 8'; }
+  else if (worst <= 2.33) { grade = '7'; gradeColor = '#fb923c'; gradeDesc = 'PSA 7 range'; }
+  else { grade = '6\u2193'; gradeColor = '#f87171'; gradeDesc = 'Off-center'; }
+
+  // --- Draw overlay on result canvas ---
+  const c = resultCtx;
+  const scale = Math.max(W, H) / 800; // scale line widths for high-res photos
+
+  // Dim outside card
+  const dimR = Math.min(cardW, cardH) * 0.035;
+  c.globalAlpha = 0.45;
+  c.fillStyle = '#000';
+  c.beginPath();
+  c.rect(0, 0, W, H);
+  c.moveTo(cardX + dimR, cardY);
+  c.arcTo(cardX, cardY, cardX, cardY + dimR, dimR);
+  c.lineTo(cardX, cardY + cardH - dimR);
+  c.arcTo(cardX, cardY + cardH, cardX + dimR, cardY + cardH, dimR);
+  c.lineTo(cardX + cardW - dimR, cardY + cardH);
+  c.arcTo(cardX + cardW, cardY + cardH, cardX + cardW, cardY + cardH - dimR, dimR);
+  c.lineTo(cardX + cardW, cardY + dimR);
+  c.arcTo(cardX + cardW, cardY, cardX + cardW - dimR, cardY, dimR);
+  c.closePath();
+  c.fill('evenodd');
+  c.globalAlpha = 1;
+
+  // Card outline with glow
+  const cardR = Math.min(cardW, cardH) * 0.035;
+  c.strokeStyle = gradeColor;
+  c.lineWidth = Math.max(2, 3 * scale);
+  c.shadowColor = gradeColor;
+  c.shadowBlur = 20 * scale;
+  roundRect(c, cardX, cardY, cardW, cardH, cardR);
+  c.stroke();
+  c.shadowBlur = 0;
+
+  // Corner dots
+  if (res.corners) {
+    c.fillStyle = '#fff';
+    res.corners.forEach(corner => {
+      const cx = corner.x * W, cy = corner.y * H;
+      c.beginPath();
+      c.arc(cx, cy, Math.max(3, 4 * scale), 0, Math.PI * 2);
+      c.fill();
+    });
+  }
+
+  // Corner brackets
+  const bLen = Math.min(40, cardW * 0.08, cardH * 0.06) * Math.max(1, scale);
+  c.strokeStyle = 'rgba(255,255,255,0.85)';
+  c.lineWidth = Math.max(2, 3 * scale);
+  c.lineCap = 'round';
+  [[cardX, cardY, 1, 1], [cardX + cardW, cardY, -1, 1], [cardX, cardY + cardH, 1, -1], [cardX + cardW, cardY + cardH, -1, -1]].forEach(([px, py, dx, dy]) => {
+    c.beginPath(); c.moveTo(px, py); c.lineTo(px + dx * bLen, py); c.stroke();
+    c.beginPath(); c.moveTo(px, py); c.lineTo(px, py + dy * bLen); c.stroke();
+  });
+  c.lineCap = 'butt';
+
+  // Inner border lines (dashed green)
+  if (borderMode && res.borders) {
+    const b = res.borders;
+    const scaleX = cardW / 100, scaleY = cardH / 140;
+    c.strokeStyle = 'rgba(52,211,153,0.5)';
+    c.lineWidth = Math.max(1, 2 * scale);
+    c.setLineDash([6 * scale, 8 * scale]);
+    const liX = cardX + b.left * scaleX;
+    c.beginPath(); c.moveTo(liX, cardY + 12 * scale); c.lineTo(liX, cardY + cardH - 12 * scale); c.stroke();
+    const riX = cardX + cardW - b.right * scaleX;
+    c.beginPath(); c.moveTo(riX, cardY + 12 * scale); c.lineTo(riX, cardY + cardH - 12 * scale); c.stroke();
+    const tiY = cardY + b.top * scaleY;
+    c.beginPath(); c.moveTo(cardX + 12 * scale, tiY); c.lineTo(cardX + cardW - 12 * scale, tiY); c.stroke();
+    const biY = cardY + cardH - b.bottom * scaleY;
+    c.beginPath(); c.moveTo(cardX + 12 * scale, biY); c.lineTo(cardX + cardW - 12 * scale, biY); c.stroke();
+    c.setLineDash([]);
+  }
+
+  // Center crosshair
+  c.strokeStyle = 'rgba(255,255,255,0.1)';
+  c.setLineDash([5 * scale, 10 * scale]);
+  c.lineWidth = Math.max(1, 1.5 * scale);
+  c.beginPath(); c.moveTo(cardX + cardW / 2, cardY + 14 * scale); c.lineTo(cardX + cardW / 2, cardY + cardH - 14 * scale); c.stroke();
+  c.beginPath(); c.moveTo(cardX + 14 * scale, cardY + cardH / 2); c.lineTo(cardX + cardW - 14 * scale, cardY + cardH / 2); c.stroke();
+  c.setLineDash([]);
+
+  // Border width labels
+  const fontSize = Math.max(12, 16 * scale);
+  c.font = '700 ' + fontSize + 'px "Inter",system-ui,sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+
+  if (borderMode && res.borders) {
+    const b = res.borders;
+    const lblOffset = Math.max(20, 30 * scale);
+    drawLabelHiRes(c, '' + b.left, cardX - lblOffset, cardY + cardH / 2, '#fb923c', scale);
+    drawLabelHiRes(c, '' + b.right, cardX + cardW + lblOffset, cardY + cardH / 2, '#fb923c', scale);
+    drawLabelHiRes(c, '' + b.top, cardX + cardW / 2, Math.max(fontSize, cardY - lblOffset * 0.7), '#38bdf8', scale);
+    drawLabelHiRes(c, '' + b.bottom, cardX + cardW / 2, Math.min(H - fontSize, cardY + cardH + lblOffset * 0.7), '#38bdf8', scale);
+  }
+
+  c.textBaseline = 'alphabetic';
+
+  // --- Update UI ---
+  // Grade badge
+  document.documentElement.style.setProperty('--grade-color', gradeColor);
+  const glowMap = {'#34d399':'rgba(52,211,153,0.35)','#a3e635':'rgba(163,230,53,0.30)','#fbbf24':'rgba(251,191,36,0.30)','#fb923c':'rgba(251,146,60,0.30)','#f87171':'rgba(248,113,113,0.30)'};
+  document.documentElement.style.setProperty('--grade-glow', glowMap[gradeColor] || 'rgba(85,85,85,0.3)');
+  const badge = document.getElementById('result-grade-badge');
+  badge.style.display = 'flex';
+  badge.style.borderColor = gradeColor;
+  badge.style.boxShadow = '0 4px 24px ' + (glowMap[gradeColor] || 'rgba(85,85,85,0.3)');
+  document.getElementById('result-grade-num').textContent = grade;
+  document.getElementById('result-grade-num').style.color = gradeColor;
+  document.getElementById('result-grade-desc').textContent = gradeDesc;
+
+  // Stats panel
+  const statsPanel = document.getElementById('results-stats');
+  statsPanel.style.display = 'block';
+  document.getElementById('stats-mode').textContent = borderMode ? 'BORDER MODE' : 'FRAME MODE';
+  document.getElementById('stat-lr-val').textContent = lrPct;
+  document.getElementById('stat-tb-val').textContent = tbPct;
+  document.getElementById('stat-lr-ratio').textContent = lrR.toFixed(2) + ':1 ratio';
+  document.getElementById('stat-tb-ratio').textContent = tbR.toFixed(2) + ':1 ratio';
+  document.getElementById('stat-lr-bar-l').style.width = barLeftPct + '%';
+  document.getElementById('stat-lr-bar-r').style.width = (100 - barLeftPct) + '%';
+  document.getElementById('stat-tb-bar-l').style.width = barTopPct + '%';
+  document.getElementById('stat-tb-bar-r').style.width = (100 - barTopPct) + '%';
+}
+
+// ================================================================
+// DRAWING HELPERS
+// ================================================================
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.lineTo(x + w - r, y); c.arcTo(x + w, y, x + w, y + r, r);
+  c.lineTo(x + w, y + h - r); c.arcTo(x + w, y + h, x + w - r, y + h, r);
+  c.lineTo(x + r, y + h); c.arcTo(x, y + h, x, y + h - r, r);
+  c.lineTo(x, y + r); c.arcTo(x, y, x + r, y, r);
+  c.closePath();
+}
+
+function drawLabelHiRes(c, text, lx, ly, color, scale) {
+  const fs = Math.max(12, 16 * scale);
+  c.font = '700 ' + fs + 'px "Inter",system-ui,sans-serif';
+  const m = c.measureText(text);
+  const pad = 6 * scale;
+  const bw = m.width + pad * 2;
+  const bh = fs + pad;
+  c.globalAlpha = 0.85;
+  c.fillStyle = 'rgba(0,0,0,0.7)';
+  roundRect(c, lx - bw / 2, ly - bh / 2, bw, bh, 6 * scale);
+  c.fill();
+  c.globalAlpha = 1;
+  c.fillStyle = color;
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(text, lx, ly);
+}
+
+// ================================================================
+// SAVE — download the result canvas as PNG
+// ================================================================
+function saveResult() {
+  if (!resultCanvas.width) return;
+
+  // Create a final canvas that includes watermark
+  const out = document.createElement('canvas');
+  out.width = resultCanvas.width;
+  out.height = resultCanvas.height;
+  const octx = out.getContext('2d');
+  octx.drawImage(resultCanvas, 0, 0);
+
+  // Watermark
+  const fs = Math.max(10, out.width * 0.015);
+  octx.font = '600 ' + fs + 'px "Inter",system-ui,sans-serif';
+  octx.fillStyle = 'rgba(255,255,255,0.25)';
+  octx.textAlign = 'right';
+  octx.textBaseline = 'bottom';
+  octx.fillText('Centering Cam', out.width - 10, out.height - 8);
+
+  const link = document.createElement('a');
+  link.download = 'centering-' + Date.now() + '.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+}
+
+// ================================================================
+// RETAKE — go back to camera
+// ================================================================
+function goRetake() {
+  analysisResult = null;
+  capturedImageData = null;
+  capturedPhotoCanvas = null;
+  switchScreen('CAMERA');
+  if (!currentStream) startCamera();
+}
+
+// ================================================================
+// BUTTON EVENT LISTENERS
+// ================================================================
+
+// Capture button
+document.getElementById('capture-btn').addEventListener('click', captureFrame);
+
+// Flip camera
+document.getElementById('flip-btn').addEventListener('click', async () => {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  torchOn = false;
+  document.getElementById('torch-btn').classList.remove('active');
+  await startCamera();
+});
+
+// Torch
+document.getElementById('torch-btn').addEventListener('click', async () => {
+  if (!currentStream) return;
+  torchOn = !torchOn;
+  try {
+    await currentStream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: torchOn }] });
+    document.getElementById('torch-btn').classList.toggle('active', torchOn);
+  } catch (e) { torchOn = false; }
+});
+
+// Gallery upload from camera screen
+document.getElementById('gallery-btn').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+document.getElementById('file-input').addEventListener('change', handleFileUpload);
+
+// Retake buttons
+document.getElementById('retake-btn').addEventListener('click', goRetake);
+document.getElementById('retake-failed-btn').addEventListener('click', goRetake);
+
+// Save button
+document.getElementById('save-btn').addEventListener('click', saveResult);
+
+// ================================================================
+// PINCH TO ZOOM (camera)
+// ================================================================
 let initialPinchDist = null, currentZoom = 1;
-wrap.addEventListener('touchstart', (e) => {
+const camWrap = document.getElementById('cam-wrap');
+
+camWrap.addEventListener('touchstart', (e) => {
   if (e.touches.length === 2) {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     initialPinchDist = Math.hypot(dx, dy);
   }
 }, { passive: true });
-wrap.addEventListener('touchmove', (e) => {
+
+camWrap.addEventListener('touchmove', (e) => {
   if (e.touches.length === 2 && initialPinchDist) {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     const dist = Math.hypot(dx, dy);
-    const scale = dist / initialPinchDist;
-    currentZoom = Math.max(1, Math.min(5, currentZoom * scale));
+    const s = dist / initialPinchDist;
+    currentZoom = Math.max(1, Math.min(5, currentZoom * s));
     applyCameraZoom(currentZoom);
     initialPinchDist = dist;
   }
 }, { passive: true });
-wrap.addEventListener('touchend', (e) => { if (e.touches.length < 2) initialPinchDist = null; }, { passive: true });
+
+camWrap.addEventListener('touchend', (e) => {
+  if (e.touches.length < 2) initialPinchDist = null;
+}, { passive: true });
 
 async function applyCameraZoom(zoom) {
   if (!currentStream) return;
@@ -1126,602 +1295,6 @@ async function applyCameraZoom(zoom) {
       await track.applyConstraints({ advanced: [{ zoom: z }] });
     }
   } catch (e) { /* zoom not supported */ }
-}
-
-// ================================================================
-// LOCK/UNLOCK WITH TRANSITION EFFECTS
-// ================================================================
-function toggleLock() {
-  if (locked) {
-    // Unlock: dissolve out
-    locked = false; lockedCard = null; lockedResult = null;
-    document.getElementById('auto-btn').classList.add('active');
-    document.getElementById('lock-btn').classList.remove('locked');
-    document.getElementById('lock-btn').textContent = '\u2B1B LOCK';
-    HAPTIC.unlock();
-  } else if (smoothCard) {
-    // Lock: click-into-place
-    locked = true;
-    lockedCard = { ...smoothCard };
-    lockedResult = lastResult ? { ...lastResult } : null;
-    document.getElementById('lock-btn').classList.add('locked');
-    document.getElementById('lock-btn').textContent = '\u2713 LOCKED';
-    document.getElementById('auto-btn').classList.remove('active');
-    HAPTIC.lock();
-    saveToHistory();
-  }
-}
-
-// ================================================================
-// BUTTON CONTROLS (fallback for non-gesture interaction)
-// ================================================================
-document.getElementById('auto-btn').addEventListener('click', () => {
-  locked = false; lockedCard = null; lockedResult = null;
-  document.getElementById('auto-btn').classList.add('active');
-  document.getElementById('lock-btn').classList.remove('locked');
-  document.getElementById('lock-btn').textContent = '\u2B1B LOCK';
-  HAPTIC.unlock();
-});
-document.getElementById('lock-btn').addEventListener('click', toggleLock);
-document.getElementById('flip-btn').addEventListener('click', async () => {
-  facingMode = facingMode === 'environment' ? 'user' : 'environment';
-  torchOn = false;
-  document.getElementById('torch-btn').classList.remove('on');
-  await startCamera();
-});
-document.getElementById('torch-btn').addEventListener('click', async () => {
-  if (!currentStream) return;
-  torchOn = !torchOn;
-  try {
-    await currentStream.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: torchOn }] });
-    document.getElementById('torch-btn').classList.toggle('on', torchOn);
-  } catch (e) { torchOn = false; }
-});
-
-// ================================================================
-// SNAPSHOT — shutter animation, not just white flash
-// ================================================================
-function doSnapshot() {
-  if (video.readyState < 4) return;
-  HAPTIC.snapshot();
-
-  flashEl.classList.remove('shutter');
-  void flashEl.offsetWidth;
-  flashEl.classList.add('shutter');
-  flashEl.addEventListener('animationend', () => flashEl.classList.remove('shutter'), { once: true });
-
-  const cw = overlay.width, ch = overlay.height, barH = 52;
-  const sc = document.createElement('canvas'); sc.width = cw; sc.height = ch + barH;
-  const sctx = sc.getContext('2d');
-  sctx.drawImage(video, 0, 0, cw, ch);
-  sctx.drawImage(overlay, 0, 0, cw, ch);
-  sctx.fillStyle = 'rgba(0,0,0,.88)'; sctx.fillRect(0, ch, cw, barH);
-
-  const res = locked ? lockedResult : lastResult;
-  const card = locked ? lockedCard : smoothCard;
-  if (card && res) {
-    sctx.font = '700 13px "Inter",sans-serif';
-    if (res.borders) {
-      sctx.fillStyle = '#fb923c';
-      sctx.fillText('L:' + res.borders.left + 'px  R:' + res.borders.right + 'px', 12, ch + 20);
-      sctx.fillStyle = '#38bdf8';
-      sctx.fillText('T:' + res.borders.top + 'px  B:' + res.borders.bottom + 'px', 12, ch + 38);
-    }
-    const gradeNum = document.getElementById('hud-grade-num').textContent;
-    const gc = getComputedStyle(document.documentElement).getPropertyValue('--grade-color').trim() || '#fff';
-    sctx.fillStyle = gc;
-    sctx.font = '900 24px "Inter",sans-serif'; sctx.textAlign = 'right';
-    sctx.fillText('PSA ' + gradeNum, cw - 12, ch + 32); sctx.textAlign = 'left';
-    sctx.fillStyle = '#555'; sctx.font = '10px "Inter",sans-serif';
-    sctx.fillText(res.borderMode ? 'BORDER MODE' : 'FRAME MODE', cw / 2 - 30, ch + 20);
-    sctx.fillText(stabilityState, cw / 2 - 20, ch + 36);
-  }
-  sctx.fillStyle = '#333'; sctx.font = '9px "Inter",sans-serif'; sctx.textAlign = 'center';
-  sctx.fillText('Centering Cam', cw / 2, ch + barH - 4);
-
-  const link = document.createElement('a');
-  link.download = 'centering-' + Date.now() + '.png';
-  link.href = sc.toDataURL('image/png');
-  link.click();
-}
-document.getElementById('snap-btn').addEventListener('click', doSnapshot);
-document.getElementById('hist-btn').addEventListener('click', () => { if (drawerOpen) closeDrawer(); else openDrawer(); });
-document.getElementById('hist-clear').addEventListener('click', () => { history = []; localStorage.setItem('cc_history', '[]'); renderHistory(); });
-
-// ================================================================
-// HISTORY
-// ================================================================
-function saveToHistory() {
-  const res = lockedResult || lastResult;
-  if (!res) return;
-  const entry = { ts: Date.now(), mode: res.borderMode ? 'BORDER' : 'FRAME', stability: stabilityState };
-  if (res.borderMode && res.borders) {
-    const b = res.borders;
-    entry.lrRatio = Math.min(b.left, b.right) > 0 ? (Math.max(b.left, b.right) / Math.min(b.left, b.right)).toFixed(2) : '?';
-    entry.tbRatio = Math.min(b.top, b.bottom) > 0 ? (Math.max(b.top, b.bottom) / Math.min(b.top, b.bottom)).toFixed(2) : '?';
-    entry.borders = { ...b };
-  } else {
-    const card = lockedCard || smoothCard;
-    if (card) {
-      const W = overlay.width, H = overlay.height;
-      const lB = card.x, rB = W - (card.x + card.w), tB = card.y, bB = H - (card.y + card.h);
-      entry.lrRatio = Math.min(lB, rB) > 2 ? (Math.max(lB, rB) / Math.min(lB, rB)).toFixed(2) : '?';
-      entry.tbRatio = Math.min(tB, bB) > 2 ? (Math.max(tB, bB) / Math.min(tB, bB)).toFixed(2) : '?';
-    }
-  }
-  entry.grade = document.getElementById('hud-grade-num').textContent;
-  history.unshift(entry);
-  if (history.length > 50) history.length = 50;
-  localStorage.setItem('cc_history', JSON.stringify(history));
-  renderHistory();
-}
-
-function renderHistory() {
-  const el = document.getElementById('hist-list');
-  if (!history.length) { el.innerHTML = '<div class="hist-empty">No scans yet</div>'; return; }
-  el.innerHTML = history.map((h, i) => {
-    const d = new Date(h.ts);
-    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const date = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    const gc = gradeColor(h.grade);
-    return '<div class="hist-entry" style="animation-delay:' + (i * 0.04) + 's">' +
-      '<span class="hist-time">' + date + ' ' + time + '</span>' +
-      '<span class="hist-ratios">' + (h.lrRatio || '?') + ':1 / ' + (h.tbRatio || '?') + ':1</span>' +
-      '<span class="hist-grade" style="color:' + gc + '">' + h.grade + '</span>' +
-      '<span style="font-size:.5rem;color:#555">' + h.mode + '</span></div>';
-  }).join('');
-}
-
-function gradeColor(g) {
-  if (g === '10') return '#34d399';
-  if (g === '9') return '#a3e635';
-  if (g === '8') return '#fbbf24';
-  if (g === '7') return '#fb923c';
-  return '#f87171';
-}
-renderHistory();
-
-// ================================================================
-// CANVAS RESIZE
-// ================================================================
-function resizeCanvas() { overlay.width = wrap.clientWidth; overlay.height = wrap.clientHeight; }
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-
-// ================================================================
-// WORKER COMMUNICATION
-// ================================================================
-worker.onmessage = function(e) {
-  workerBusy = false;
-  const d = e.data;
-  if (!d.found) {
-    if (Date.now() - lastDetect > 1200) {
-      smoothCard = null; lastResult = null; hadCard = false;
-      statusBar.textContent = 'Searching \u2014 place card on dark surface';
-      stabilityBuf.length = 0; stabilityState = 'MOVING';
-      if (hudShown) {
-        hudShown = false;
-        document.getElementById('hud-badge').style.opacity = '0';
-        document.getElementById('hud-ratios').style.opacity = '0';
-      }
-      overlayAlpha = 0;
-      modeBadge.textContent = 'FRAME';
-      modeBadge.style.background = '#333'; modeBadge.style.color = '#888';
-    }
-    return;
-  }
-
-  lastResult = d;
-  const W = overlay.width, H = overlay.height;
-  const n = { x: d.left * W, y: d.top * H, w: d.width * W, h: d.height * H };
-
-  if (!smoothCard) {
-    smoothCard = { ...n };
-    if (!hadCard) {
-      hadCard = true;
-      HAPTIC.detect();
-      // Smooth overlay fade-in on first detection
-      overlay.classList.add('fade-in');
-      if (!hudShown) {
-        hudShown = true;
-        const badge = document.getElementById('hud-badge');
-        const ratios = document.getElementById('hud-ratios');
-        badge.style.opacity = '1'; ratios.style.opacity = '1';
-        badge.classList.add('entering'); ratios.classList.add('entering');
-        document.getElementById('controls').classList.add('entering');
-        setTimeout(() => {
-          badge.classList.remove('entering'); ratios.classList.remove('entering');
-          document.getElementById('controls').classList.remove('entering');
-        }, 600);
-      }
-    }
-  } else {
-    smoothCard.x = lerp(smoothCard.x, n.x, SMOOTH);
-    smoothCard.y = lerp(smoothCard.y, n.y, SMOOTH);
-    smoothCard.w = lerp(smoothCard.w, n.w, SMOOTH);
-    smoothCard.h = lerp(smoothCard.h, n.h, SMOOTH);
-  }
-  lastDetect = Date.now();
-  overlayAlpha = Math.min(1, overlayAlpha + 0.12);
-
-  // Mode badge transition with pop animation
-  const newMode = d.borderMode ? 'BORDER' : 'FRAME';
-  if (prevMode !== newMode) {
-    if (prevMode !== null) {
-      modeBadge.classList.remove('pop'); void modeBadge.offsetWidth; modeBadge.classList.add('pop');
-      setTimeout(() => modeBadge.classList.remove('pop'), 400);
-    }
-    prevMode = newMode;
-  }
-
-  if (d.borderMode) {
-    modeBadge.textContent = 'BORDER';
-    modeBadge.style.background = 'rgba(52,211,153,0.2)'; modeBadge.style.color = '#34d399';
-    document.getElementById('hud-mode-label').textContent = 'BORDER MODE';
-    document.getElementById('drawer-mode').textContent = 'BORDER MODE';
-    document.getElementById('lr-section-title').innerHTML = '\u25C0 L Border / R Border \u25B6';
-    document.getElementById('tb-section-title').innerHTML = '\u25B2 T Border / B Border \u25BC';
-  } else {
-    modeBadge.textContent = 'FRAME';
-    modeBadge.style.background = '#333'; modeBadge.style.color = '#888';
-    document.getElementById('hud-mode-label').textContent = 'FRAME MODE';
-    document.getElementById('drawer-mode').textContent = 'FRAME MODE';
-    document.getElementById('lr-section-title').innerHTML = '\u25C0 Left / Right \u25B6';
-    document.getElementById('tb-section-title').innerHTML = '\u25B2 Top / Bottom \u25BC';
-  }
-
-  statusBar.textContent = 'Detected \u00B7 AR ' + d.ar.toFixed(2) + ' \u00B7 ' + newMode + ' \u00B7 ' + stabilityState;
-  const cx = smoothCard.x + smoothCard.w / 2, cy = smoothCard.y + smoothCard.h / 2;
-  stabilityBuf.push({ cx, cy });
-  if (stabilityBuf.length > STABILITY_SIZE) stabilityBuf.shift();
-  updateStability();
-};
-
-function sendFrame() {
-  if (workerBusy || video.readyState < 4) return;
-  try { pctx.drawImage(video, 0, 0, PW, PH); } catch (e) { return; }
-  const imgData = pctx.getImageData(0, 0, PW, PH);
-  workerBusy = true;
-  worker.postMessage({ data: imgData.data, width: PW, height: PH });
-}
-
-// ================================================================
-// STABILITY + RING UPDATE
-// ================================================================
-function updateStability() {
-  if (stabilityBuf.length < 3) { stabilityState = 'MOVING'; updateStabilityRing(); return; }
-  const n = stabilityBuf.length;
-  let sx = 0, sy = 0;
-  for (const p of stabilityBuf) { sx += p.cx; sy += p.cy; }
-  const mx = sx / n, my = sy / n;
-  let v = 0;
-  for (const p of stabilityBuf) { v += (p.cx - mx) ** 2 + (p.cy - my) ** 2; }
-  v = Math.sqrt(v / n);
-  if (v > 15) stabilityState = 'MOVING';
-  else if (v > 8) stabilityState = 'ADJUSTING';
-  else if (v > 3) stabilityState = 'SETTLING';
-  else stabilityState = 'STABLE';
-  updateStabilityRing();
-}
-
-function updateStabilityRing() {
-  const pct = STABILITY_PERCENT[stabilityState] || 0.25;
-  const color = STABILITY_COLORS[stabilityState] || '#f87171';
-  // HUD ring (circumference = 2*PI*28 = 175.93)
-  const ringHud = document.getElementById('stability-ring');
-  if (ringHud) { ringHud.style.strokeDashoffset = (175.93 * (1 - pct)).toFixed(2); ringHud.style.stroke = color; }
-  // Drawer ring (circumference = 2*PI*31 = 194.78)
-  const ringDetail = document.getElementById('stability-ring-detail');
-  if (ringDetail) { ringDetail.style.strokeDashoffset = (194.78 * (1 - pct)).toFixed(2); ringDetail.style.stroke = color; }
-  const hudStab = document.getElementById('hud-stability');
-  if (hudStab) { hudStab.textContent = stabilityState; hudStab.style.color = color; }
-  const drawerStab = document.getElementById('drawer-stability');
-  if (drawerStab) { drawerStab.textContent = stabilityState; drawerStab.style.color = color; }
-}
-
-// ================================================================
-// MAIN LOOP
-// ================================================================
-function loop() {
-  requestAnimationFrame(loop);
-  if (!locked) sendFrame();
-  const card = locked ? lockedCard : smoothCard;
-  const res = locked ? lockedResult : lastResult;
-  drawOverlay(card, res);
-  if (card) updateStats(card, res);
-}
-
-// ================================================================
-// REDESIGNED OVERLAY — clean, minimal, rounded
-// ================================================================
-function drawOverlay(card, res) {
-  const W = overlay.width, H = overlay.height;
-  ctx.clearRect(0, 0, W, H);
-
-  if (!card) {
-    // Searching: subtle scan line + rounded card guide
-    const t = (Date.now() / 2000) % 1;
-    const scanY = t * H;
-    ctx.strokeStyle = 'rgba(251,191,36,0.08)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(W, scanY); ctx.stroke();
-    const gx = W * 0.12, gy = H * 0.08, gw = W * 0.76, gh = H * 0.84;
-    ctx.strokeStyle = 'rgba(251,191,36,0.12)'; ctx.setLineDash([8, 8]); ctx.lineWidth = 1.5;
-    roundRect(ctx, gx, gy, gw, gh, 12); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(251,191,36,0.35)'; ctx.font = '11px "Inter"';
-    ctx.textAlign = 'center'; ctx.fillText('Position card in frame', W / 2, H / 2);
-    return;
-  }
-
-  const alpha = overlayAlpha;
-  const { x, y, w: cw, h: ch } = card;
-
-  // Dim outside card (with rounded cutout)
-  const dimR = Math.min(cw, ch) * 0.035;
-  ctx.globalAlpha = alpha * 0.4; ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.rect(0, 0, W, H);
-  // Cut out rounded card shape (counter-clockwise winding)
-  ctx.moveTo(x + dimR, y);
-  ctx.arcTo(x, y, x, y + dimR, dimR);
-  ctx.lineTo(x, y + ch - dimR);
-  ctx.arcTo(x, y + ch, x + dimR, y + ch, dimR);
-  ctx.lineTo(x + cw - dimR, y + ch);
-  ctx.arcTo(x + cw, y + ch, x + cw, y + ch - dimR, dimR);
-  ctx.lineTo(x + cw, y + dimR);
-  ctx.arcTo(x + cw, y, x + cw - dimR, y, dimR);
-  ctx.closePath();
-  ctx.fill('evenodd');
-  ctx.globalAlpha = alpha;
-
-  // Grade color
-  const worst = res && res.borderMode ? getBorderWorst(res.borders) : getFrameWorst(card);
-  const bc = worst <= 1.22 ? '#34d399' : worst <= 1.5 ? '#a3e635' : worst <= 1.86 ? '#fbbf24' : worst <= 2.33 ? '#fb923c' : '#f87171';
-
-  // Card outline with rounded corners (matches real card radius)
-  const cardR = Math.min(cw, ch) * 0.035;
-  ctx.strokeStyle = bc; ctx.lineWidth = locked ? 3 : 2;
-  ctx.shadowColor = bc; ctx.shadowBlur = locked ? 16 : 10;
-  roundRect(ctx, x, y, cw, ch, cardR); ctx.stroke(); ctx.shadowBlur = 0;
-
-  // Lock: second outer border for "solid click" feel
-  if (locked) {
-    ctx.strokeStyle = bc; ctx.lineWidth = 1; ctx.globalAlpha = alpha * 0.4;
-    roundRect(ctx, x - 4, y - 4, cw + 8, ch + 8, cardR + 3); ctx.stroke();
-    ctx.globalAlpha = alpha;
-  }
-
-  // Corner brackets (clean white, rounded caps)
-  const bLen = Math.min(24, cw * 0.08, ch * 0.06);
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-  [[x, y, 1, 1], [x + cw, y, -1, 1], [x, y + ch, 1, -1], [x + cw, y + ch, -1, -1]].forEach(([px, py, dx, dy]) => {
-    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + dx * bLen, py); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + dy * bLen); ctx.stroke();
-  });
-  ctx.lineCap = 'butt';
-
-  // Inner border lines (subtle dashed, inset from card edges)
-  if (res && res.borderMode && res.borders) {
-    const b = res.borders;
-    const scaleX = cw / 100, scaleY = ch / 140;
-    ctx.strokeStyle = 'rgba(52,211,153,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
-    const liX = x + b.left * scaleX;
-    ctx.beginPath(); ctx.moveTo(liX, y + 8); ctx.lineTo(liX, y + ch - 8); ctx.stroke();
-    const riX = x + cw - b.right * scaleX;
-    ctx.beginPath(); ctx.moveTo(riX, y + 8); ctx.lineTo(riX, y + ch - 8); ctx.stroke();
-    const tiY = y + b.top * scaleY;
-    ctx.beginPath(); ctx.moveTo(x + 8, tiY); ctx.lineTo(x + cw - 8, tiY); ctx.stroke();
-    const biY = y + ch - b.bottom * scaleY;
-    ctx.beginPath(); ctx.moveTo(x + 8, biY); ctx.lineTo(x + cw - 8, biY); ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  // Center crosshair (very subtle)
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.setLineDash([3, 6]); ctx.lineWidth = 0.75;
-  ctx.beginPath(); ctx.moveTo(x + cw / 2, y + 10); ctx.lineTo(x + cw / 2, y + ch - 10); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + 10, y + ch / 2); ctx.lineTo(x + cw - 10, y + ch / 2); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Tiny tick marks at card edges (replaces full-screen extension lines)
-  ctx.lineWidth = 1; ctx.globalAlpha = alpha * 0.5;
-  const tickLen = 12;
-  ctx.strokeStyle = '#fb923c';
-  ctx.beginPath(); ctx.moveTo(x, y + ch / 2); ctx.lineTo(x - tickLen, y + ch / 2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + cw, y + ch / 2); ctx.lineTo(x + cw + tickLen, y + ch / 2); ctx.stroke();
-  ctx.strokeStyle = '#38bdf8';
-  ctx.beginPath(); ctx.moveTo(x + cw / 2, y); ctx.lineTo(x + cw / 2, y - tickLen); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x + cw / 2, y + ch); ctx.lineTo(x + cw / 2, y + ch + tickLen); ctx.stroke();
-  ctx.globalAlpha = alpha;
-
-  // Border pixel labels (compact pill)
-  ctx.font = '700 10px "Inter",sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  if (res && res.borderMode && res.borders) {
-    const b = res.borders;
-    const lo = Math.min(28, x / 2);
-    drawLabel(ctx, '' + b.left, x - lo, y + ch / 2, '#fb923c', alpha);
-    drawLabel(ctx, '' + b.right, x + cw + lo, y + ch / 2, '#fb923c', alpha);
-    drawLabel(ctx, '' + b.top, x + cw / 2, Math.max(12, y - 14), '#38bdf8', alpha);
-    drawLabel(ctx, '' + b.bottom, x + cw / 2, Math.min(H - 12, y + ch + 14), '#38bdf8', alpha);
-  } else {
-    const lB = Math.round(x), rB = Math.round(W - (x + cw)), tB = Math.round(y), bB = Math.round(H - (y + ch));
-    if (lB > 20) drawLabel(ctx, '' + lB, x / 2, y + ch / 2, '#fb923c', alpha);
-    if (rB > 20) drawLabel(ctx, '' + rB, x + cw + (W - x - cw) / 2, y + ch / 2, '#fb923c', alpha);
-    if (tB > 16) drawLabel(ctx, '' + tB, x + cw / 2, y / 2, '#38bdf8', alpha);
-    if (bB > 16) drawLabel(ctx, '' + bB, x + cw / 2, y + ch + (H - y - ch) / 2, '#38bdf8', alpha);
-  }
-  ctx.textBaseline = 'alphabetic';
-
-  // Guided chevrons (thin, clean — replaces thick arrows)
-  if (!locked) drawGuidedChevrons(card, res, W, H, alpha);
-  ctx.globalAlpha = 1;
-}
-
-function roundRect(c, x, y, w, h, r) {
-  c.beginPath();
-  c.moveTo(x + r, y);
-  c.lineTo(x + w - r, y); c.arcTo(x + w, y, x + w, y + r, r);
-  c.lineTo(x + w, y + h - r); c.arcTo(x + w, y + h, x + w - r, y + h, r);
-  c.lineTo(x + r, y + h); c.arcTo(x, y + h, x, y + h - r, r);
-  c.lineTo(x, y + r); c.arcTo(x, y, x + r, y, r);
-  c.closePath();
-}
-
-function drawLabel(c, text, lx, ly, color, alpha) {
-  const m = c.measureText(text);
-  c.globalAlpha = alpha * 0.8; c.fillStyle = 'rgba(0,0,0,0.6)';
-  const bw = m.width + 6, bh = 14;
-  roundRect(c, lx - bw / 2, ly - bh / 2, bw, bh, 4); c.fill();
-  c.globalAlpha = alpha; c.fillStyle = color; c.fillText(text, lx, ly);
-}
-
-// Double-chevrons — thin, elegant guidance arrows
-function drawGuidedChevrons(card, res, W, H, alpha) {
-  let lrDiff = 0, tbDiff = 0;
-  if (res && res.borderMode && res.borders) {
-    lrDiff = res.borders.left - res.borders.right;
-    tbDiff = res.borders.top - res.borders.bottom;
-  } else {
-    lrDiff = card.x - (W - (card.x + card.w));
-    tbDiff = card.y - (H - (card.y + card.h));
-  }
-
-  const thresh = res && res.borderMode ? 3 : 20;
-  const cx = card.x + card.w / 2, cy = card.y + card.h / 2;
-  const breathe = 0.4 + Math.sin(Date.now() / 600) * 0.3;
-  ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-
-  function chevron(px, py, dir, vertical, color) {
-    ctx.strokeStyle = color; ctx.globalAlpha = alpha * breathe;
-    const hw = 5, hh = 3; // half-width=5 (10px wide), half-height=3 (6px tall)
-    const gap = 6;
-    if (vertical) {
-      for (let i = 0; i < 2; i++) {
-        const oy = py + dir * (i * gap);
-        ctx.beginPath(); ctx.moveTo(px - hw, oy); ctx.lineTo(px, oy + dir * hh); ctx.lineTo(px + hw, oy); ctx.stroke();
-      }
-    } else {
-      for (let i = 0; i < 2; i++) {
-        const ox = px + dir * (i * gap);
-        ctx.beginPath(); ctx.moveTo(ox, py - hw); ctx.lineTo(ox + dir * hh, py); ctx.lineTo(ox, py + hw); ctx.stroke();
-      }
-    }
-    ctx.globalAlpha = alpha;
-  }
-
-  if (Math.abs(lrDiff) > thresh) chevron(cx + (lrDiff > 0 ? -35 : 35), cy, lrDiff > 0 ? -1 : 1, false, 'rgba(251,146,60,0.7)');
-  if (Math.abs(tbDiff) > thresh) chevron(cx, cy + (tbDiff > 0 ? -35 : 35), tbDiff > 0 ? -1 : 1, true, 'rgba(56,189,248,0.7)');
-  ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
-}
-
-// ================================================================
-// STATS — updates HUD gauges, drawer details, CSS grade theming
-// ================================================================
-function getFrameWorst(card) {
-  const W = overlay.width, H = overlay.height;
-  const lB = card.x, rB = W - (card.x + card.w), tB = card.y, bB = H - (card.y + card.h);
-  return Math.max(
-    Math.min(lB, rB) > 2 ? Math.max(lB, rB) / Math.min(lB, rB) : 99,
-    Math.min(tB, bB) > 2 ? Math.max(tB, bB) / Math.min(tB, bB) : 99
-  );
-}
-function getBorderWorst(b) {
-  if (!b) return 99;
-  return Math.max(
-    Math.min(b.left, b.right) > 0 ? Math.max(b.left, b.right) / Math.min(b.left, b.right) : 99,
-    Math.min(b.top, b.bottom) > 0 ? Math.max(b.top, b.bottom) / Math.min(b.top, b.bottom) : 99
-  );
-}
-
-function updateStats(card, res) {
-  const borderMode = res && res.borderMode && res.borders;
-  let lrR, tbR, lrPct, tbPct, barLeftPct, barTopPct;
-
-  if (borderMode) {
-    const b = res.borders;
-    lrR = Math.min(b.left, b.right) > 0 ? Math.max(b.left, b.right) / Math.min(b.left, b.right) : 99;
-    tbR = Math.min(b.top, b.bottom) > 0 ? Math.max(b.top, b.bottom) / Math.min(b.top, b.bottom) : 99;
-    const lrT = b.left + b.right, tbT = b.top + b.bottom;
-    lrPct = lrT ? Math.round(b.left / lrT * 100) + '/' + Math.round(b.right / lrT * 100) : '\u2014';
-    tbPct = tbT ? Math.round(b.top / tbT * 100) + '/' + Math.round(b.bottom / tbT * 100) : '\u2014';
-    barLeftPct = lrT ? (b.left / lrT * 100) : 50;
-    barTopPct = tbT ? (b.top / tbT * 100) : 50;
-  } else {
-    const W = overlay.width, H = overlay.height;
-    const lB = card.x, rB = W - (card.x + card.w), tB = card.y, bB = H - (card.y + card.h);
-    lrR = Math.min(lB, rB) > 2 ? Math.max(lB, rB) / Math.min(lB, rB) : 99;
-    tbR = Math.min(tB, bB) > 2 ? Math.max(tB, bB) / Math.min(tB, bB) : 99;
-    const lrT = lB + rB, tbT = tB + bB;
-    lrPct = lrT ? Math.round(lB / lrT * 100) + '/' + Math.round(rB / lrT * 100) : '\u2014';
-    tbPct = tbT ? Math.round(tB / tbT * 100) + '/' + Math.round(bB / tbT * 100) : '\u2014';
-    barLeftPct = lrT ? (lB / lrT * 100) : 50;
-    barTopPct = tbT ? (tB / tbT * 100) : 50;
-  }
-  const barRightPct = 100 - barLeftPct;
-  const barBottomPct = 100 - barTopPct;
-
-  // Drawer detail stats
-  const el = (id) => document.getElementById(id);
-  if (el('lr-val')) el('lr-val').textContent = lrPct;
-  if (el('tb-val')) el('tb-val').textContent = tbPct;
-  if (el('lr-ratio')) el('lr-ratio').textContent = lrR.toFixed(2) + ':1';
-  if (el('tb-ratio')) el('tb-ratio').textContent = tbR.toFixed(2) + ':1';
-  if (el('lr-bar-left')) el('lr-bar-left').style.width = barLeftPct + '%';
-  if (el('lr-bar-right')) el('lr-bar-right').style.width = barRightPct + '%';
-  if (el('tb-bar-left')) el('tb-bar-left').style.width = barTopPct + '%';
-  if (el('tb-bar-right')) el('tb-bar-right').style.width = barBottomPct + '%';
-
-  // HUD ratio gauges (arc circumference = 2*PI*18 = 113.1)
-  const ac = 113.1;
-  if (el('lr-arc-left')) el('lr-arc-left').style.strokeDashoffset = (ac * (1 - barLeftPct / 100 * 0.5)).toFixed(2);
-  if (el('lr-arc-right')) el('lr-arc-right').style.strokeDashoffset = (ac * (1 - barRightPct / 100 * 0.5)).toFixed(2);
-  if (el('tb-arc-left')) el('tb-arc-left').style.strokeDashoffset = (ac * (1 - barTopPct / 100 * 0.5)).toFixed(2);
-  if (el('tb-arc-right')) el('tb-arc-right').style.strokeDashoffset = (ac * (1 - barBottomPct / 100 * 0.5)).toFixed(2);
-  if (el('lr-ratio-text')) el('lr-ratio-text').textContent = lrR < 10 ? lrR.toFixed(1) : '9+';
-  if (el('tb-ratio-text')) el('tb-ratio-text').textContent = tbR < 10 ? tbR.toFixed(1) : '9+';
-  if (el('lr-pct')) el('lr-pct').textContent = lrPct;
-  if (el('tb-pct')) el('tb-pct').textContent = tbPct;
-
-  // Grade computation
-  const worst = Math.max(lrR, tbR);
-  let grade, color, desc;
-  if (worst <= 1.22) { grade = '10'; color = '#34d399'; desc = borderMode ? 'PSA 10 centering' : 'PSA 10 territory'; }
-  else if (worst <= 1.50) { grade = '9'; color = '#a3e635'; desc = 'Strong PSA 9'; }
-  else if (worst <= 1.86) { grade = '8'; color = '#fbbf24'; desc = 'Likely PSA 8'; }
-  else if (worst <= 2.33) { grade = '7'; color = '#fb923c'; desc = 'PSA 7 range'; }
-  else { grade = '6\u2193'; color = '#f87171'; desc = 'Off-center'; }
-
-  // Grade morph animation on value change
-  if (prevGrade !== null && prevGrade !== grade) {
-    const prev = parseInt(prevGrade) || 0;
-    const curr = parseInt(grade) || 0;
-    if (curr > prev) {
-      HAPTIC.gradeUp();
-      const dc = el('grade-detail-card');
-      if (dc) { dc.classList.remove('sparkle'); void dc.offsetWidth; dc.classList.add('sparkle'); setTimeout(() => dc.classList.remove('sparkle'), 700); }
-    }
-    [el('hud-grade-num'), el('drawer-grade-num')].forEach(e => {
-      if (!e) return;
-      e.classList.remove('grade-morph'); void e.offsetWidth; e.classList.add('grade-morph');
-      setTimeout(() => e.classList.remove('grade-morph'), 450);
-    });
-  }
-  prevGrade = grade;
-
-  // Update all grade displays
-  if (el('hud-grade-num')) { el('hud-grade-num').textContent = grade; el('hud-grade-num').style.color = color; }
-  if (el('drawer-grade-num')) { el('drawer-grade-num').textContent = grade; el('drawer-grade-num').style.color = color; }
-  if (el('hud-desc')) el('hud-desc').textContent = desc;
-  if (el('drawer-grade-desc')) el('drawer-grade-desc').textContent = desc;
-  if (el('drawer-worst')) el('drawer-worst').textContent = 'Worst axis: ' + worst.toFixed(2) + ':1';
-  if (el('drawer-peek-grade')) { el('drawer-peek-grade').textContent = 'PSA ' + grade; el('drawer-peek-grade').style.color = color; }
-
-  // CSS custom property theming
-  const glowMap = {'#34d399':'rgba(52,211,153,0.35)','#a3e635':'rgba(163,230,53,0.30)','#fbbf24':'rgba(251,191,36,0.30)','#fb923c':'rgba(251,146,60,0.30)','#f87171':'rgba(248,113,113,0.30)'};
-  document.documentElement.style.setProperty('--grade-color', color);
-  document.documentElement.style.setProperty('--grade-glow', glowMap[color] || 'rgba(85,85,85,0.3)');
-  const badge = el('hud-badge');
-  if (badge) badge.classList.add('has-grade');
-  document.querySelector('header').style.borderBottomColor = color;
 }
 
 </script>
