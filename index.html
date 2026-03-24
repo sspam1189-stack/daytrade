@@ -585,6 +585,145 @@ function detectBorders(warped, w, h) {
 }
 
 // ================================================================
+// CARD-SHAPED VALIDATION
+// ================================================================
+function isCardShaped(l, t, r, b, PW, PH) {
+  const cw = r - l, ch = b - t;
+  if (cw < PW * 0.08 || ch < PH * 0.08) return false;
+  const ar = cw / ch;
+  // Card is 2.5x3.5 = 0.714 portrait or 1.4 landscape
+  return ar >= 0.4 && ar <= 1.6;
+}
+
+// ================================================================
+// STRATEGY 1: Brightness-based (Otsu on grayscale)
+// Best for: card on dark/contrasting surface
+// ================================================================
+function detectByBrightness(gray, PW, PH) {
+  const thresh = otsu(gray, PW * PH);
+
+  const rowBright = new Float32Array(PH);
+  const colBright = new Float32Array(PW);
+  for (let y = 0; y < PH; y++) {
+    let cnt = 0;
+    for (let x = 0; x < PW; x++) { if (gray[y*PW+x] > thresh) cnt++; }
+    rowBright[y] = cnt / PW;
+  }
+  for (let x = 0; x < PW; x++) {
+    let cnt = 0;
+    for (let y = 0; y < PH; y++) { if (gray[y*PW+x] > thresh) cnt++; }
+    colBright[x] = cnt / PH;
+  }
+
+  // Try multiple thresholds for the projection
+  for (const T of [0.30, 0.20, 0.15, 0.10]) {
+    let top=-1, bot=-1, left=-1, right=-1;
+    for (let y = 0; y < PH; y++) { if (rowBright[y] > T) { if (top<0) top=y; bot=y; } }
+    for (let x = 0; x < PW; x++) { if (colBright[x] > T) { if (left<0) left=x; right=x; } }
+    if (top>=0 && bot>=0 && left>=0 && right>=0 && isCardShaped(left,top,right,bot,PW,PH)) {
+      return { left, top, right, bot, method: 'brightness', thresh };
+    }
+  }
+  return null;
+}
+
+// ================================================================
+// STRATEGY 2: Edge-based (Sobel + projection peaks)
+// Best for: card on similar-brightness surface
+// ================================================================
+function detectByEdges(mag, edgeThresh, PW, PH) {
+  const rowEdge = new Float32Array(PH);
+  const colEdge = new Float32Array(PW);
+  for (let y = 1; y < PH-1; y++) {
+    let cnt = 0;
+    for (let x = 1; x < PW-1; x++) { if (mag[y*PW+x] > edgeThresh) cnt++; }
+    rowEdge[y] = cnt / (PW-2);
+  }
+  for (let x = 1; x < PW-1; x++) {
+    let cnt = 0;
+    for (let y = 1; y < PH-1; y++) { if (mag[y*PW+x] > edgeThresh) cnt++; }
+    colEdge[x] = cnt / (PH-2);
+  }
+
+  for (const T of [0.12, 0.08, 0.05]) {
+    let top=-1, bot=-1, left=-1, right=-1;
+    for (let y = 0; y < PH; y++) { if (rowEdge[y] > T) { if (top<0) top=y; bot=y; } }
+    for (let x = 0; x < PW; x++) { if (colEdge[x] > T) { if (left<0) left=x; right=x; } }
+    if (top>=0 && bot>=0 && left>=0 && right>=0 && isCardShaped(left,top,right,bot,PW,PH)) {
+      return { left, top, right, bot, method: 'edges', thresh: edgeThresh };
+    }
+  }
+  return null;
+}
+
+// ================================================================
+// STRATEGY 3: Combined — use Otsu on grayscale to find bright
+// region, then refine edges with Sobel within that region
+// ================================================================
+function detectCombined(gray, mag, edgeThresh, PW, PH) {
+  // First find approximate region by brightness
+  const grayThresh = otsu(gray, PW * PH);
+
+  // Find rough bounding box of bright area
+  let minY=PH, maxY=0, minX=PW, maxX=0;
+  for (let y = 0; y < PH; y++) {
+    for (let x = 0; x < PW; x++) {
+      if (gray[y*PW+x] > grayThresh) {
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+      }
+    }
+  }
+
+  if (maxY-minY < PH*0.08 || maxX-minX < PW*0.08) return null;
+
+  // Now refine: within this region, find the strongest horizontal edges (card top/bottom)
+  // and strongest vertical edges (card left/right) using Sobel
+  const pad = 15;
+  const searchTop = Math.max(0, minY - pad);
+  const searchBot = Math.min(PH-1, maxY + pad);
+  const searchLeft = Math.max(0, minX - pad);
+  const searchRight = Math.min(PW-1, maxX + pad);
+
+  // Find rows with strongest horizontal edges in the search region
+  const rowStrength = new Float32Array(PH);
+  for (let y = searchTop; y <= searchBot; y++) {
+    let s = 0;
+    for (let x = searchLeft; x <= searchRight; x++) {
+      if (mag[y*PW+x] > edgeThresh) s++;
+    }
+    rowStrength[y] = s;
+  }
+
+  const colStrength = new Float32Array(PW);
+  for (let x = searchLeft; x <= searchRight; x++) {
+    let s = 0;
+    for (let y = searchTop; y <= searchBot; y++) {
+      if (mag[y*PW+x] > edgeThresh) s++;
+    }
+    colStrength[x] = s;
+  }
+
+  // Find top edge: first strong row in top half of region
+  const midY = (minY + maxY) / 2;
+  const midX = (minX + maxX) / 2;
+  let top = -1, bot = -1, left = -1, right = -1;
+
+  const minStrength = 3;
+  for (let y = searchTop; y < midY; y++) { if (rowStrength[y] > minStrength) { top = y; break; } }
+  for (let y = searchBot; y > midY; y--) { if (rowStrength[y] > minStrength) { bot = y; break; } }
+  for (let x = searchLeft; x < midX; x++) { if (colStrength[x] > minStrength) { left = x; break; } }
+  for (let x = searchRight; x > midX; x--) { if (colStrength[x] > minStrength) { right = x; break; } }
+
+  if (top>=0 && bot>=0 && left>=0 && right>=0 && isCardShaped(left,top,right,bot,PW,PH)) {
+    return { left, top, right, bot, method: 'combined', thresh: grayThresh };
+  }
+  return null;
+}
+
+// ================================================================
 // MAIN DETECTION PIPELINE
 // ================================================================
 self.onmessage = function(e) {
@@ -596,48 +735,43 @@ self.onmessage = function(e) {
     gray[i] = (pixels[i*4]*77 + pixels[i*4+1]*150 + pixels[i*4+2]*29) >> 8;
   }
 
-  // 2. Blur
+  // 2. Blur + Sobel (needed for edge-based strategies and corner refinement)
   const blurred = blur3x3(gray, PW, PH);
-
-  // 3. Sobel
   const { mag } = sobel(blurred, PW, PH);
-
-  // 4. Otsu on gradient magnitude
   const edgeThresh = otsu(mag, PW * PH);
 
-  // 5. Binary edge map + projection
-  const rowEdge = new Float32Array(PH);
-  const colEdge = new Float32Array(PW);
-  for (let y = 1; y < PH-1; y++) {
-    let cnt = 0;
-    for (let x = 1; x < PW-1; x++) {
-      if (mag[y*PW+x] > edgeThresh) cnt++;
-    }
-    rowEdge[y] = cnt / (PW-2);
-  }
-  for (let x = 1; x < PW-1; x++) {
-    let cnt = 0;
-    for (let y = 1; y < PH-1; y++) {
-      if (mag[y*PW+x] > edgeThresh) cnt++;
-    }
-    colEdge[x] = cnt / (PH-2);
+  // 3. Try multiple detection strategies, pick the best
+  const candidates = [
+    detectByBrightness(gray, PW, PH),
+    detectByEdges(mag, edgeThresh, PW, PH),
+    detectCombined(gray, mag, edgeThresh, PW, PH),
+  ].filter(Boolean);
+
+  if (candidates.length === 0) {
+    self.postMessage({ found: false });
+    return;
   }
 
-  const ROW_T = 0.12, COL_T = 0.12;
-  let top = -1, bot = -1, left = -1, right = -1;
-  for (let y = 0; y < PH; y++) { if (rowEdge[y] > ROW_T) { if (top < 0) top = y; bot = y; } }
-  for (let x = 0; x < PW; x++) { if (colEdge[x] > COL_T) { if (left < 0) left = x; right = x; } }
+  // Pick the candidate with aspect ratio closest to a standard card (0.714)
+  const IDEAL_AR = 0.714;
+  let best = candidates[0];
+  let bestScore = Infinity;
+  for (const c of candidates) {
+    const cw = c.right - c.left, ch = c.bot - c.top;
+    const ar = cw / ch;
+    const arDist = Math.abs(ar - IDEAL_AR) + Math.abs(1/ar - 1/IDEAL_AR);
+    // Prefer larger detections (card should be a significant portion of frame)
+    const sizePenalty = 1 - (cw * ch) / (PW * PH);
+    const score = arDist + sizePenalty * 0.5;
+    if (score < bestScore) { bestScore = score; best = c; }
+  }
 
-  if (top < 0 || bot < 0 || left < 0 || right < 0) { self.postMessage({ found: false }); return; }
-
+  let { left, top, right, bot } = best;
   const cw = right - left, ch = bot - top;
-  if (cw < PW * 0.1 || ch < PH * 0.1) { self.postMessage({ found: false }); return; }
-
   const ar = cw / ch;
-  if (ar < 0.4 || ar > 1.15) { self.postMessage({ found: false }); return; }
 
-  // 6. Collect edge pixels near each boundary for line fitting
-  const margin = 6;
+  // 4. Collect edge pixels near each boundary for line fitting
+  const margin = 8;
   const topPts = [], botPts = [], leftPts = [], rightPts = [];
 
   for (let x = left + 5; x < right - 5; x++) {
@@ -657,7 +791,7 @@ self.onmessage = function(e) {
     }
   }
 
-  // 7. Fit lines
+  // 5. Fit lines + find corners
   const topLine = fitLineBest(topPts);
   const botLine = fitLineBest(botPts);
   const leftLine = fitLineBest(leftPts);
@@ -674,12 +808,12 @@ self.onmessage = function(e) {
 
     if (tl && tr && br && bl) {
       const allInBounds = [tl,tr,br,bl].every(p =>
-        p.x >= -10 && p.x <= PW+10 && p.y >= -10 && p.y <= PH+10
+        p.x >= -15 && p.x <= PW+15 && p.y >= -15 && p.y <= PH+15
       );
       if (allInBounds) {
         corners = [tl, tr, br, bl];
 
-        // 8. Perspective warp + inner border detection
+        // 6. Perspective warp + inner border detection
         const WARP_W = 100, WARP_H = 140;
         const warped = warpCard(pixels, PW, PH, corners, WARP_W, WARP_H);
         if (warped) {
@@ -694,7 +828,8 @@ self.onmessage = function(e) {
     left: left / PW, top: top / PH,
     width: cw / PW, height: ch / PH,
     ar,
-    threshold: edgeThresh,
+    method: best.method,
+    threshold: best.thresh,
   };
 
   if (corners) {
