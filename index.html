@@ -348,7 +348,7 @@ async function fetchSPY() {
         close: +parseFloat(v['4. close']).toFixed(2),
         volume: parseInt(v['5. volume'])
       })).sort((a, b) => a.date - b.date);
-      const tradingBars = bars.filter(b => b.date.getDay() !== 0 && b.date.getDay() !== 6).slice(-63);
+      const tradingBars = bars.filter(b => b.date.getDay() !== 0 && b.date.getDay() !== 6).slice(-21);
       dataCache[cacheKey] = tradingBars;
       return tradingBars;
     }
