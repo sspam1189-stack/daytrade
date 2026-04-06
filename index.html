@@ -972,6 +972,13 @@ function buildAll() {
   }
 
   // Extend labels and datasets with nulls for real data, values for projection
+  // Remove duplicate: if first projection label matches last historical label, skip it
+  if (projLabels.length && labels.length && projLabels[0] === labels[labels.length - 1]) {
+    projLabels.shift();
+    projMid.shift();
+    projHi.shift();
+    projLo.shift();
+  }
   const projLen = projLabels.length;
   const allLabels = [...labels, ...projLabels];
 
