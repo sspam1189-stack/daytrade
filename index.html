@@ -377,14 +377,15 @@ async function fetchSPY() {
         });
       }
       // Filter out weekends from intraday data, then trim to N trading days
+      // Filter out weekends from all data
+      const tradingBars = bars.filter(b => b.date.getDay() !== 0 && b.date.getDay() !== 6);
       if (currentInterval === '15m' || currentInterval === '60m') {
-        const tradingBars = bars.filter(b => b.date.getDay() !== 0 && b.date.getDay() !== 6);
         const tradingDays = currentInterval === '15m' ? 5 : 7;
-        // Find unique trading dates
         const uniqueDates = [...new Set(tradingBars.map(b => b.date.toDateString()))];
         const keepDates = new Set(uniqueDates.slice(-tradingDays));
         return tradingBars.filter(b => keepDates.has(b.date.toDateString()));
       }
+      return tradingBars;
       return bars;
     } catch (e) { lastErr = e; }
   }
