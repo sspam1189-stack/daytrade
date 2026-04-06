@@ -3,52 +3,128 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SPY 15-Min Entry / Exit Model</title>
+<title>SPY Weekly Options — Support & Resistance</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
-  :root{--bg:#0a0a0a;--panel:#111;--border:#222;--text:#ccc;--muted:#555;--green:#00e676;--red:#ff1744;--cyan:#00e5ff;--amber:#ffb300;--purple:#ce93d8;--blue:#42a5f5;--orange:#ffa726;}
-  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;min-height:100vh;padding:16px;}
-  h1{font-size:1.15rem;font-weight:600;color:#fff;margin-bottom:2px;}
-  .subtitle{font-size:11px;color:var(--muted);margin-bottom:14px;}
+  :root{
+    --bg:#0b0b0f;--panel:#13131a;--border:#1e1e2a;--text:#c8c8d4;--muted:#55556a;
+    --green:#00e676;--green-dim:rgba(0,230,118,.12);
+    --red:#ff1744;--red-dim:rgba(255,23,68,.12);
+    --cyan:#00e5ff;--amber:#ffb300;--purple:#ce93d8;--blue:#42a5f5;--orange:#ffa726;
+    --card-radius:10px;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;min-height:100vh;padding:20px 24px;}
+
+  /* Header */
+  .header{margin-bottom:20px;}
+  .header h1{font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:10px;}
+  .header h1 .live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .subtitle{font-size:12px;color:var(--muted);line-height:1.5;}
+
+  /* Summary banner */
+  .summary-banner{background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid var(--border);border-radius:var(--card-radius);padding:20px 24px;margin-bottom:16px;}
+  .summary-text{font-size:15px;line-height:1.7;color:#ddd;}
+  .summary-text .price{font-weight:700;color:#fff;font-size:1.1em;}
+  .summary-text .support{color:var(--green);font-weight:600;}
+  .summary-text .resistance{color:var(--red);font-weight:600;}
+  .summary-text .trend{font-weight:600;}
+  .summary-text .trend.bullish{color:var(--green);}
+  .summary-text .trend.bearish{color:var(--red);}
+  .summary-text .trend.neutral{color:var(--amber);}
+
+  /* Stats row */
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;}
+  .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--card-radius);padding:14px 16px;}
+  .stat-card .label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+  .stat-card .value{font-size:1.5rem;font-weight:700;}
+  .stat-card .sub{font-size:11px;color:var(--muted);margin-top:4px;}
 
   /* Sliders */
-  .slider-row{display:flex;flex-wrap:wrap;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:12px;}
-  .slider-group{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:90px;flex:1;}
+  .slider-row{display:flex;flex-wrap:wrap;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:var(--card-radius);padding:14px 18px;margin-bottom:16px;}
+  .slider-group{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:100px;flex:1;}
   .slider-label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
-  .slider-val{font-size:1.1rem;font-weight:600;color:#fff;}
-  input[type=range]{width:100%;accent-color:var(--cyan);cursor:pointer;}
-
-  /* Stat cards */
-  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
-  .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 14px;}
-  .stat-card .label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
-  .stat-card .value{font-size:1.6rem;font-weight:700;}
+  .slider-val{font-size:1rem;font-weight:600;color:#fff;}
+  input[type=range]{width:100%;accent-color:var(--cyan);cursor:pointer;height:4px;}
 
   /* Charts */
-  .chart-wrap{background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-bottom:8px;padding:10px 12px;}
-  .chart-title{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
-  .leg{display:inline-flex;align-items:center;gap:5px;}
-  .leg-line{width:16px;height:2px;border-radius:1px;}
+  .chart-wrap{background:var(--panel);border:1px solid var(--border);border-radius:var(--card-radius);margin-bottom:12px;padding:14px 16px;}
+  .chart-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+  .chart-title{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;}
+  .leg{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#888;}
+  .leg-line{width:14px;height:2px;border-radius:1px;}
   canvas{width:100%!important;}
 
-  /* Entry/Exit legend */
-  .rules-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
-  .rule-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 14px;}
-  .rule-card h3{font-size:11px;font-weight:600;letter-spacing:.05em;margin-bottom:10px;}
-  .rule-card ul{list-style:none;display:flex;flex-direction:column;gap:7px;}
-  .rule-card li{font-size:12px;color:#aaa;display:flex;align-items:flex-start;gap:8px;}
+  /* S/R table */
+  .sr-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+  .sr-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--card-radius);padding:16px;}
+  .sr-card h3{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;}
+  .sr-card.support-card h3{color:var(--green);}
+  .sr-card.resistance-card h3{color:var(--red);}
+  .sr-level{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+  .sr-level:last-child{border-bottom:none;}
+  .sr-level .level-name{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+  .sr-level .level-price{font-weight:600;color:#fff;}
+  .sr-level .level-dist{font-size:11px;}
+  .sr-level .level-dist.below{color:var(--green);}
+  .sr-level .level-dist.above{color:var(--red);}
+
+  /* Rules */
+  .rules-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
+  .rule-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--card-radius);padding:16px;}
+  .rule-card h3{font-size:12px;font-weight:600;letter-spacing:.05em;margin-bottom:12px;}
+  .rule-card ul{list-style:none;display:flex;flex-direction:column;gap:8px;}
+  .rule-card li{font-size:13px;color:#aaa;display:flex;align-items:flex-start;gap:8px;line-height:1.4;}
   .rule-card li::before{content:'●';flex-shrink:0;margin-top:1px;}
-  .long-rules h3{color:var(--green);}
-  .long-rules li::before{color:var(--green);}
-  .exit-rules h3{color:var(--red);}
-  .exit-rules li::before{color:var(--red);}
+  .call-rules h3{color:var(--green);}
+  .call-rules li::before{color:var(--green);}
+  .put-rules h3{color:var(--red);}
+  .put-rules li::before{color:var(--red);}
+
+  /* Loading */
+  .loading{display:flex;align-items:center;justify-content:center;min-height:400px;flex-direction:column;gap:12px;}
+  .loading .spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading p{color:var(--muted);font-size:13px;}
+  .error-msg{background:var(--red-dim);border:1px solid rgba(255,23,68,.3);border-radius:var(--card-radius);padding:16px;color:var(--red);margin:20px 0;font-size:13px;}
+
+  @media(max-width:640px){
+    body{padding:12px;}
+    .stats-row{grid-template-columns:1fr 1fr;}
+    .sr-grid,.rules-row{grid-template-columns:1fr;}
+    .slider-row{gap:6px;padding:10px 12px;}
+  }
 </style>
 </head>
 <body>
 
-<h1>SPY 15-Min Entry / Exit Model</h1>
-<p class="subtitle">TSI + RSI + EMA 7/21/50/200 — simulated price data · adjust params to see signal changes</p>
+<div class="header">
+  <h1>SPY Weekly Options <span class="live-dot"></span></h1>
+  <p class="subtitle">Support & Resistance · Daily chart with TSI + RSI + EMAs · Live data</p>
+</div>
+
+<div id="app-loading" class="loading">
+  <div class="spinner"></div>
+  <p>Fetching SPY data…</p>
+</div>
+
+<div id="app-content" style="display:none">
+
+<div class="summary-banner" id="summary-banner">
+  <div class="summary-text" id="summary-text">Loading…</div>
+</div>
+
+<div class="stats-row" id="stats-row">
+  <div class="stat-card"><div class="label">Current Price</div><div class="value" id="stat-price" style="color:#fff">—</div><div class="sub" id="stat-date"></div></div>
+  <div class="stat-card"><div class="label">Weekly Range</div><div class="value" id="stat-range" style="color:var(--cyan)">—</div><div class="sub" id="stat-range-pct"></div></div>
+  <div class="stat-card"><div class="label">Trend Bias</div><div class="value" id="stat-trend">—</div><div class="sub" id="stat-trend-detail"></div></div>
+  <div class="stat-card"><div class="label">RSI (14)</div><div class="value" id="stat-rsi" style="color:var(--amber)">—</div><div class="sub" id="stat-rsi-label"></div></div>
+  <div class="stat-card"><div class="label">Nearest Support</div><div class="value" id="stat-support" style="color:var(--green)">—</div><div class="sub" id="stat-support-dist"></div></div>
+  <div class="stat-card"><div class="label">Nearest Resistance</div><div class="value" id="stat-resist" style="color:var(--red)">—</div><div class="sub" id="stat-resist-dist"></div></div>
+</div>
 
 <div class="slider-row">
   <div class="slider-group">
@@ -58,128 +134,132 @@
   </div>
   <div class="slider-group">
     <div class="slider-label">TSI Long</div>
-    <input type="range" id="s-tsi-long" min="5" max="50" value="14">
-    <div class="slider-val" id="v-tsi-long">14</div>
+    <input type="range" id="s-tsi-long" min="5" max="50" value="25">
+    <div class="slider-val" id="v-tsi-long">25</div>
   </div>
   <div class="slider-group">
     <div class="slider-label">TSI Short</div>
-    <input type="range" id="s-tsi-short" min="2" max="25" value="7">
-    <div class="slider-val" id="v-tsi-short">7</div>
+    <input type="range" id="s-tsi-short" min="2" max="25" value="13">
+    <div class="slider-val" id="v-tsi-short">13</div>
   </div>
   <div class="slider-group">
     <div class="slider-label">TSI Signal</div>
-    <input type="range" id="s-tsi-signal" min="2" max="25" value="13">
-    <div class="slider-val" id="v-tsi-signal">13</div>
+    <input type="range" id="s-tsi-signal" min="2" max="25" value="7">
+    <div class="slider-val" id="v-tsi-signal">7</div>
   </div>
   <div class="slider-group">
-    <div class="slider-label">RSI Midline</div>
-    <input type="range" id="s-rsi-mid" min="30" max="70" value="50">
-    <div class="slider-val" id="v-rsi-mid">50</div>
+    <div class="slider-label">S/R Lookback</div>
+    <input type="range" id="s-sr-lookback" min="3" max="10" value="5">
+    <div class="slider-val" id="v-sr-lookback">5</div>
   </div>
 </div>
 
-<div class="stats-row">
-  <div class="stat-card"><div class="label">Long Entries</div><div class="value" id="stat-long" style="color:var(--green)">—</div></div>
-  <div class="stat-card"><div class="label">Exit Signals</div><div class="value" id="stat-exit" style="color:var(--red)">—</div></div>
-  <div class="stat-card"><div class="label">Bullish Bars</div><div class="value" id="stat-bull" style="color:var(--cyan)">—</div></div>
-  <div class="stat-card"><div class="label">Last RSI</div><div class="value" id="stat-rsi" style="color:var(--amber)">—</div></div>
-</div>
-
 <div class="chart-wrap">
-  <div class="chart-title">
-    <span>15-min price + emas</span>
-    <span class="leg"><span class="leg-line" style="background:#fff"></span>Price</span>
-    <span class="leg"><span class="leg-line" style="background:var(--purple)"></span>EMA 7</span>
-    <span class="leg"><span class="leg-line" style="background:var(--cyan)"></span>EMA 21</span>
-    <span class="leg"><span class="leg-line" style="background:var(--orange)"></span>EMA 50</span>
-    <span class="leg"><span class="leg-line" style="background:var(--red)"></span>EMA 200</span>
-    <span class="leg"><span style="color:var(--green);font-size:12px">▲</span>Long</span>
-    <span class="leg"><span style="color:var(--red);font-size:12px">▼</span>Exit</span>
+  <div class="chart-header">
+    <div class="chart-title">Daily Price + EMAs + Support/Resistance</div>
+    <div class="legend">
+      <span class="leg"><span class="leg-line" style="background:#fff"></span>Close</span>
+      <span class="leg"><span class="leg-line" style="background:var(--purple)"></span>EMA 7</span>
+      <span class="leg"><span class="leg-line" style="background:var(--cyan)"></span>EMA 21</span>
+      <span class="leg"><span class="leg-line" style="background:var(--orange)"></span>EMA 50</span>
+      <span class="leg"><span class="leg-line" style="background:rgba(0,230,118,.4);height:6px"></span>Support</span>
+      <span class="leg"><span class="leg-line" style="background:rgba(255,23,68,.4);height:6px"></span>Resistance</span>
+    </div>
   </div>
-  <div style="position:relative;height:280px"><canvas id="priceChart"></canvas></div>
+  <div style="position:relative;height:340px"><canvas id="priceChart"></canvas></div>
+</div>
+
+<div class="sr-grid" id="sr-grid">
+  <div class="sr-card support-card">
+    <h3>Support Levels</h3>
+    <div id="support-levels"></div>
+  </div>
+  <div class="sr-card resistance-card">
+    <h3>Resistance Levels</h3>
+    <div id="resistance-levels"></div>
+  </div>
 </div>
 
 <div class="chart-wrap">
-  <div class="chart-title">
-    <span>TSI — True Strength Index</span>
-    <span class="leg"><span class="leg-line" style="background:var(--blue)"></span>TSI</span>
-    <span class="leg"><span class="leg-line" style="background:var(--amber);border-top:2px dashed var(--amber);background:none"></span>Signal line</span>
-    <span class="leg"><span class="leg-line" style="background:var(--muted)"></span>Zero</span>
+  <div class="chart-header">
+    <div class="chart-title">TSI — True Strength Index</div>
+    <div class="legend">
+      <span class="leg"><span class="leg-line" style="background:var(--blue)"></span>TSI</span>
+      <span class="leg"><span class="leg-line" style="background:var(--amber)"></span>Signal</span>
+      <span class="leg"><span class="leg-line" style="background:var(--muted)"></span>Zero</span>
+    </div>
   </div>
   <div style="position:relative;height:160px"><canvas id="tsiChart"></canvas></div>
 </div>
 
 <div class="chart-wrap">
-  <div class="chart-title">
-    <span>RSI</span>
-    <span class="leg"><span class="leg-line" style="background:var(--blue)"></span>RSI</span>
-    <span class="leg"><span class="leg-line" style="background:var(--red)"></span>70 overbought</span>
-    <span class="leg"><span class="leg-line" style="background:var(--muted)"></span>Midline</span>
-    <span class="leg"><span class="leg-line" style="background:var(--green)"></span>30 oversold</span>
+  <div class="chart-header">
+    <div class="chart-title">RSI — Relative Strength Index</div>
+    <div class="legend">
+      <span class="leg"><span class="leg-line" style="background:var(--blue)"></span>RSI</span>
+      <span class="leg"><span class="leg-line" style="background:var(--red)"></span>70</span>
+      <span class="leg"><span class="leg-line" style="background:var(--green)"></span>30</span>
+    </div>
   </div>
-  <div style="position:relative;height:130px"><canvas id="rsiChart"></canvas></div>
+  <div style="position:relative;height:140px"><canvas id="rsiChart"></canvas></div>
 </div>
 
 <div class="rules-row">
-  <div class="rule-card long-rules">
-    <h3>Long entry — all required</h3>
+  <div class="rule-card call-rules">
+    <h3>Weekly Call Setup — look for all</h3>
     <ul>
-      <li>EMA 7 above EMA 21</li>
-      <li>Price above EMA 21</li>
+      <li>Price near or bouncing off support level</li>
+      <li>RSI rising from oversold (&lt;35) or near midline</li>
       <li>TSI crosses above signal line</li>
-      <li>RSI at or above midline – 5</li>
+      <li>EMA 7 above EMA 21 (short-term uptrend)</li>
+      <li>Price above EMA 21</li>
     </ul>
   </div>
-  <div class="rule-card exit-rules">
-    <h3>Exit — any one fires</h3>
+  <div class="rule-card put-rules">
+    <h3>Weekly Put Setup — look for all</h3>
     <ul>
+      <li>Price near or rejecting from resistance level</li>
+      <li>RSI falling from overbought (&gt;65) or weakening</li>
       <li>TSI crosses below signal line</li>
-      <li>Price closes below EMA 21</li>
-      <li>RSI drops below midline + 5</li>
-      <li>EMA 7 crosses below EMA 21</li>
+      <li>EMA 7 below EMA 21 (short-term downtrend)</li>
+      <li>Price below EMA 21</li>
     </ul>
   </div>
 </div>
 
-<script>
-// ─── Seeded RNG ───────────────────────────────────────────────
-let S = 54321;
-const rng = () => { S = (S * 1664525 + 1013904223) >>> 0; return S / 4294967296; };
+</div><!-- /app-content -->
 
-// ─── Generate 15-min bars (5 days) ───────────────────────────
-function genDay(dateStr, open, close, hi, lo, vol) {
-  S = 54321; // reset seed per day for consistency
-  const bars = [], N = 26;
-  let cur = open;
-  for (let i = 0; i < N; i++) {
-    const prog = i / (N - 1);
-    const target = open + (close - open) * prog;
-    const trend = (target - cur) * 0.28;
-    const noise = (rng() - 0.5) * 2.8;
-    const o = +cur.toFixed(2);
-    const rawC = cur + trend + noise;
-    const c = +Math.max(lo + .05, Math.min(hi - .05, rawC)).toFixed(2);
-    cur = c;
-    const mins = 570 + i * 15;
-    const label = `D${dateStr} ${String(Math.floor(mins/60)).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`;
-    bars.push({ label, close: c });
+<script>
+// ─── Fetch real SPY data ────────────────────────────────────
+async function fetchSPY() {
+  const range = '3mo';
+  const interval = '1d';
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=${range}&interval=${interval}&includePrePost=false`;
+  const proxy = `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+
+  const res = await fetch(proxy);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const result = json.chart.result[0];
+  const ts = result.timestamp;
+  const q = result.indicators.quote[0];
+
+  const bars = [];
+  for (let i = 0; i < ts.length; i++) {
+    if (q.close[i] == null) continue;
+    bars.push({
+      date: new Date(ts[i] * 1000),
+      open: +q.open[i].toFixed(2),
+      high: +q.high[i].toFixed(2),
+      low: +q.low[i].toFixed(2),
+      close: +q.close[i].toFixed(2),
+      volume: q.volume[i]
+    });
   }
-  bars[N-1].close = close;
   return bars;
 }
 
-const allBars = [
-  ...genDay(1, 630.5, 638.0, 643.5, 628.86, 170000),
-  ...genDay(2, 637.8, 649.5, 655.0, 634.0,  250000),
-  ...genDay(3, 649.0, 656.8, 658.52, 646.0, 360000),
-  ...genDay(4, 656.0, 651.0, 658.0, 645.0,  200000),
-  ...genDay(5, 651.5, 654.79,658.0, 648.0,  195000),
-];
-
-const labels = allBars.map(b => b.label);
-const prices = allBars.map(b => b.close);
-
-// ─── Indicator helpers ────────────────────────────────────────
+// ─── Indicator helpers ──────────────────────────────────────
 function emaArr(data, period) {
   const k = 2 / (period + 1);
   let v = data[0];
@@ -192,224 +272,304 @@ function emaRaw(data, period) {
   return data.map((d, i) => { v = i === 0 ? d : d * k + v * (1 - k); return v; });
 }
 
-function computeTSI(longP, shortP, sigP) {
-  const pc  = prices.map((c, i) => i === 0 ? 0 : c - prices[i-1]);
+function computeTSI(prices, longP, shortP, sigP) {
+  const pc = prices.map((c, i) => i === 0 ? 0 : c - prices[i - 1]);
   const apc = pc.map(Math.abs);
-  const ds  = emaRaw(emaRaw(pc, longP), shortP);
+  const ds = emaRaw(emaRaw(pc, longP), shortP);
   const ads = emaRaw(emaRaw(apc, longP), shortP);
   const tsi = ds.map((v, i) => ads[i] === 0 ? 0 : 100 * v / ads[i]);
   const sig = emaRaw(tsi, sigP);
   return { tsi, sig };
 }
 
-function computeRSI(period) {
+function computeRSI(prices, period) {
   let ag = 0, al = 0;
-  for (let i = 1; i <= period; i++) {
-    const d = prices[i] - prices[i-1];
+  for (let i = 1; i <= Math.min(period, prices.length - 1); i++) {
+    const d = prices[i] - prices[i - 1];
     if (d > 0) ag += d; else al -= d;
   }
   ag /= period; al /= period;
   return prices.map((_, i) => {
     if (i > period) {
-      const d = prices[i] - prices[i-1];
-      ag = (ag * (period-1) + Math.max(0, d)) / period;
-      al = (al * (period-1) + Math.max(0,-d)) / period;
+      const d = prices[i] - prices[i - 1];
+      ag = (ag * (period - 1) + Math.max(0, d)) / period;
+      al = (al * (period - 1) + Math.max(0, -d)) / period;
     }
     if (i < period) return 50;
     return +(100 - 100 / (1 + (al === 0 ? 100 : ag / al))).toFixed(2);
   });
 }
 
-// ─── Compute signals ──────────────────────────────────────────
-function computeSignals(tsiLong, tsiShort, tsiSig, rsiPeriod, rsiMid) {
-  const e7   = emaArr(prices, 7);
-  const e21  = emaArr(prices, 21);
-  const e50  = emaArr(prices, 50);
-  const e200 = emaArr(prices, 200);
-  const { tsi, sig } = computeTSI(tsiLong, tsiShort, tsiSig);
-  const rsi  = computeRSI(rsiPeriod);
-
-  const longPts = [], exitPts = [];
-  let bullBars = 0;
-  const warmup = Math.max(tsiLong + tsiShort, rsiPeriod, 200) + 5;
-
-  const isBull = i => e7[i] > e21[i] && prices[i] > e21[i] && rsi[i] >= rsiMid - 5 && tsi[i] > sig[i];
-
-  for (let i = 1; i < prices.length; i++) {
-    if (isBull(i)) bullBars++;
-    if (i < warmup) continue;
-
-    const tsiCrossUp   = tsi[i-1] <= sig[i-1] && tsi[i] > sig[i];
-    const tsiCrossDown = tsi[i-1] >= sig[i-1] && tsi[i] < sig[i];
-    const e7CrossDown  = e7[i-1] >= e21[i-1]  && e7[i]  < e21[i];
-
-    const longEntry = e7[i] > e21[i] && prices[i] > e21[i] && tsiCrossUp && rsi[i] >= rsiMid - 5;
-    const exitFire  = tsiCrossDown || prices[i] < e21[i] || rsi[i] < rsiMid + 5 || e7CrossDown;
-
-    if (longEntry) longPts.push({ x: labels[i], y: prices[i] });
-    if (exitFire && !longEntry) exitPts.push({ x: labels[i], y: prices[i] });
+// ─── Support / Resistance detection ─────────────────────────
+function findSwingPoints(bars, lookback) {
+  const supports = [], resistances = [];
+  for (let i = lookback; i < bars.length - lookback; i++) {
+    let isHigh = true, isLow = true;
+    for (let j = 1; j <= lookback; j++) {
+      if (bars[i].high <= bars[i - j].high || bars[i].high <= bars[i + j].high) isHigh = false;
+      if (bars[i].low >= bars[i - j].low || bars[i].low >= bars[i + j].low) isLow = false;
+    }
+    if (isHigh) resistances.push({ price: bars[i].high, date: bars[i].date, type: 'swing' });
+    if (isLow) supports.push({ price: bars[i].low, date: bars[i].date, type: 'swing' });
   }
-
-  return { e7, e21, e50, e200, tsi, sig, rsi, longPts, exitPts, bullBars };
+  return { supports, resistances };
 }
 
-// ─── Chart setup ─────────────────────────────────────────────
-const GRID = 'rgba(255,255,255,0.04)';
-const baseOpts = (min, max, yLabel) => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: { duration: 250 },
-  interaction: { mode: 'index', intersect: false },
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: '#1a1a1a',
-      borderColor: '#333',
-      borderWidth: 1,
-      titleColor: '#888',
-      bodyColor: '#ddd',
-      titleFont: { size: 10 },
-      bodyFont: { size: 11 },
-      callbacks: { label: ctx => ` ${ctx.dataset.label}: ${(+ctx.parsed.y).toFixed(2)}` }
-    }
-  },
-  scales: {
-    x: {
-      ticks: {
-        color: '#444',
-        font: { size: 9 },
-        maxTicksLimit: 15,
-        maxRotation: 0,
-        callback: (val, idx) => {
-          const l = labels[idx];
-          if (!l) return '';
-          if (l.includes('09:30')) return l.replace('09:30','Open');
-          if (l.includes('12:45')) return l.split(' ')[1];
-          return '';
-        }
-      },
-      grid: { color: GRID }
-    },
-    y: {
-      min, max,
-      ticks: { color: '#555', font: { size: 10 }, callback: v => yLabel ? `${v.toFixed(0)}` : v.toFixed(1) },
-      grid: { color: GRID }
+function computePivots(bars) {
+  const recent = bars.slice(-5);
+  const H = Math.max(...recent.map(b => b.high));
+  const L = Math.min(...recent.map(b => b.low));
+  const C = bars[bars.length - 1].close;
+  const PP = (H + L + C) / 3;
+  return {
+    supports: [
+      { price: +(2 * PP - H).toFixed(2), type: 'S1' },
+      { price: +(PP - (H - L)).toFixed(2), type: 'S2' },
+      { price: +(L - 2 * (H - PP)).toFixed(2), type: 'S3' },
+    ],
+    resistances: [
+      { price: +(2 * PP - L).toFixed(2), type: 'R1' },
+      { price: +(PP + (H - L)).toFixed(2), type: 'R2' },
+      { price: +(H + 2 * (PP - L)).toFixed(2), type: 'R3' },
+    ],
+    pivot: +PP.toFixed(2)
+  };
+}
+
+function clusterLevels(levels, threshold) {
+  if (!levels.length) return [];
+  const sorted = [...levels].sort((a, b) => a.price - b.price);
+  const clusters = [{ price: sorted[0].price, type: sorted[0].type, count: 1 }];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = clusters[clusters.length - 1];
+    if (Math.abs(sorted[i].price - last.price) / last.price < threshold) {
+      last.price = (last.price * last.count + sorted[i].price) / (last.count + 1);
+      last.count++;
+      last.type = last.count > 1 ? 'cluster' : sorted[i].type;
+    } else {
+      clusters.push({ price: sorted[i].price, type: sorted[i].type, count: 1 });
     }
   }
-});
+  return clusters.map(c => ({ price: +c.price.toFixed(2), type: c.type, strength: c.count }));
+}
 
+// ─── Chart globals ──────────────────────────────────────────
+const GRID = 'rgba(255,255,255,0.04)';
 let priceChart, tsiChart, rsiChart;
+let BARS = [];
 
-function buildCharts(d) {
+function fmt(d) {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function buildAll() {
+  const prices = BARS.map(b => b.close);
+  const labels = BARS.map(b => fmt(b.date));
+  const lookback = +document.getElementById('s-sr-lookback').value;
+  const rsiPeriod = +document.getElementById('s-rsi-period').value;
+  const tsiLong = +document.getElementById('s-tsi-long').value;
+  const tsiShort = +document.getElementById('s-tsi-short').value;
+  const tsiSig = +document.getElementById('s-tsi-signal').value;
+
+  const e7 = emaArr(prices, 7);
+  const e21 = emaArr(prices, 21);
+  const e50 = emaArr(prices, 50);
+  const { tsi, sig } = computeTSI(prices, tsiLong, tsiShort, tsiSig);
+  const rsi = computeRSI(prices, rsiPeriod);
+
+  // S/R
+  const swings = findSwingPoints(BARS, lookback);
+  const pivots = computePivots(BARS);
+  const allSupports = clusterLevels([...swings.supports, ...pivots.supports], 0.005);
+  const allResists = clusterLevels([...swings.resistances, ...pivots.resistances], 0.005);
+
+  const curPrice = prices[prices.length - 1];
+  const supBelow = allSupports.filter(s => s.price < curPrice).sort((a, b) => b.price - a.price);
+  const resAbove = allResists.filter(r => r.price > curPrice).sort((a, b) => a.price - b.price);
+
+  // Weekly range (last 5 bars)
+  const week = BARS.slice(-5);
+  const weekHi = Math.max(...week.map(b => b.high));
+  const weekLo = Math.min(...week.map(b => b.low));
+  const weekRange = weekHi - weekLo;
+
+  // Trend
+  const lastRsi = rsi[rsi.length - 1];
+  const lastTsi = tsi[tsi.length - 1];
+  const lastSig = sig[sig.length - 1];
+  const ema7Above21 = e7[e7.length - 1] > e21[e21.length - 1];
+  const priceAbove21 = curPrice > e21[e21.length - 1];
+  const tsiAboveSig = lastTsi > lastSig;
+
+  let trendBias = 'Neutral', trendClass = 'neutral';
+  const bullScore = (ema7Above21 ? 1 : 0) + (priceAbove21 ? 1 : 0) + (tsiAboveSig ? 1 : 0) + (lastRsi > 50 ? 1 : 0);
+  if (bullScore >= 3) { trendBias = 'Bullish'; trendClass = 'bullish'; }
+  else if (bullScore <= 1) { trendBias = 'Bearish'; trendClass = 'bearish'; }
+
+  // ── Update stats ──
+  document.getElementById('stat-price').textContent = '$' + curPrice.toFixed(2);
+  document.getElementById('stat-date').textContent = fmt(BARS[BARS.length - 1].date);
+  document.getElementById('stat-range').textContent = '$' + weekRange.toFixed(2);
+  document.getElementById('stat-range-pct').textContent = `${weekLo.toFixed(2)} – ${weekHi.toFixed(2)}`;
+  document.getElementById('stat-trend').textContent = trendBias;
+  document.getElementById('stat-trend').style.color = trendClass === 'bullish' ? 'var(--green)' : trendClass === 'bearish' ? 'var(--red)' : 'var(--amber)';
+  document.getElementById('stat-trend-detail').textContent = `${bullScore}/4 bullish signals`;
+  document.getElementById('stat-rsi').textContent = lastRsi.toFixed(1);
+  document.getElementById('stat-rsi-label').textContent = lastRsi > 70 ? 'Overbought' : lastRsi < 30 ? 'Oversold' : lastRsi > 50 ? 'Above midline' : 'Below midline';
+
+  const nearSup = supBelow[0];
+  const nearRes = resAbove[0];
+  document.getElementById('stat-support').textContent = nearSup ? '$' + nearSup.price.toFixed(2) : '—';
+  document.getElementById('stat-support-dist').textContent = nearSup ? ((curPrice - nearSup.price) / curPrice * 100).toFixed(1) + '% below' : '';
+  document.getElementById('stat-resist').textContent = nearRes ? '$' + nearRes.price.toFixed(2) : '—';
+  document.getElementById('stat-resist-dist').textContent = nearRes ? ((nearRes.price - curPrice) / curPrice * 100).toFixed(1) + '% above' : '';
+
+  // ── Summary ──
+  let summaryHTML = `SPY is at <span class="price">$${curPrice.toFixed(2)}</span>`;
+  if (nearSup) summaryHTML += ` — above support at <span class="support">$${nearSup.price.toFixed(2)}</span>`;
+  if (nearRes) summaryHTML += `, below resistance at <span class="resistance">$${nearRes.price.toFixed(2)}</span>`;
+  summaryHTML += `. Trend bias is <span class="trend ${trendClass}">${trendBias}</span>`;
+  summaryHTML += ` with RSI at ${lastRsi.toFixed(1)}. Weekly range: $${weekLo.toFixed(2)}–$${weekHi.toFixed(2)}.`;
+  document.getElementById('summary-text').innerHTML = summaryHTML;
+
+  // ── S/R level cards ──
+  const renderLevels = (arr, el, dir) => {
+    el.innerHTML = arr.slice(0, 4).map(l => {
+      const dist = ((Math.abs(l.price - curPrice)) / curPrice * 100).toFixed(1);
+      return `<div class="sr-level">
+        <span class="level-name">${l.type}</span>
+        <span class="level-price">$${l.price.toFixed(2)}</span>
+        <span class="level-dist ${dir}">${dist}% ${dir === 'below' ? 'below' : 'above'}</span>
+      </div>`;
+    }).join('');
+  };
+  renderLevels(supBelow, document.getElementById('support-levels'), 'below');
+  renderLevels(resAbove, document.getElementById('resistance-levels'), 'above');
+
+  // ── Build S/R annotations ──
+  const annotations = {};
+  supBelow.slice(0, 3).forEach((s, i) => {
+    annotations['sup' + i] = {
+      type: 'box', yMin: s.price - 0.5, yMax: s.price + 0.5,
+      backgroundColor: 'rgba(0,230,118,0.08)', borderColor: 'rgba(0,230,118,0.3)', borderWidth: 1,
+      label: { display: true, content: 'S $' + s.price.toFixed(0), position: 'start', color: 'rgba(0,230,118,.6)', font: { size: 9 } }
+    };
+  });
+  resAbove.slice(0, 3).forEach((r, i) => {
+    annotations['res' + i] = {
+      type: 'box', yMin: r.price - 0.5, yMax: r.price + 0.5,
+      backgroundColor: 'rgba(255,23,68,0.08)', borderColor: 'rgba(255,23,68,0.3)', borderWidth: 1,
+      label: { display: true, content: 'R $' + r.price.toFixed(0), position: 'start', color: 'rgba(255,23,68,.6)', font: { size: 9 } }
+    };
+  });
+
   // ── Price chart ──
+  const pMin = Math.floor(Math.min(...prices, ...supBelow.slice(0, 3).map(s => s.price)) - 3);
+  const pMax = Math.ceil(Math.max(...prices, ...resAbove.slice(0, 3).map(r => r.price)) + 3);
+
   const priceData = {
     labels,
     datasets: [
-      { label: 'Price',  data: prices,  borderColor: '#ffffff', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
-      { label: 'EMA 7',  data: d.e7,    borderColor: '#ce93d8', borderWidth: 1,   pointRadius: 0, tension: 0.3 },
-      { label: 'EMA 21', data: d.e21,   borderColor: '#00e5ff', borderWidth: 1,   pointRadius: 0, tension: 0.3 },
-      { label: 'EMA 50', data: d.e50,   borderColor: '#ffa726', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
-      { label: 'EMA 200',data: d.e200,  borderColor: '#ff1744', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
-      {
-        label: 'Long', data: d.longPts, borderColor: 'transparent', backgroundColor: '#00e676',
-        pointRadius: 8, pointStyle: 'triangle', pointHoverRadius: 10,
-        showLine: false, parsing: { xAxisKey: 'x', yAxisKey: 'y' }
-      },
-      {
-        label: 'Exit', data: d.exitPts, borderColor: 'transparent', backgroundColor: '#ff1744',
-        pointRadius: 8, pointStyle: 'triangle', pointHoverRadius: 10, rotation: 180,
-        showLine: false, parsing: { xAxisKey: 'x', yAxisKey: 'y' }
-      },
+      { label: 'Close', data: prices, borderColor: '#fff', borderWidth: 1.8, pointRadius: 2, pointBackgroundColor: '#fff', tension: 0.25, fill: false },
+      { label: 'EMA 7', data: e7, borderColor: '#ce93d8', borderWidth: 1.2, pointRadius: 0, tension: 0.3 },
+      { label: 'EMA 21', data: e21, borderColor: '#00e5ff', borderWidth: 1.2, pointRadius: 0, tension: 0.3 },
+      { label: 'EMA 50', data: e50, borderColor: '#ffa726', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
     ]
   };
 
-  const pMin = Math.floor(Math.min(...prices) - 2);
-  const pMax = Math.ceil(Math.max(...prices) + 2);
+  const priceOpts = {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 300 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      annotation: { annotations },
+      tooltip: { backgroundColor: '#1a1a2e', borderColor: '#333', borderWidth: 1, titleColor: '#888', bodyColor: '#ddd', titleFont: { size: 10 }, bodyFont: { size: 12 },
+        callbacks: { label: ctx => ` ${ctx.dataset.label}: $${(+ctx.parsed.y).toFixed(2)}` }
+      }
+    },
+    scales: {
+      x: { ticks: { color: '#555', font: { size: 10 }, maxTicksLimit: 12, maxRotation: 0 }, grid: { color: GRID } },
+      y: { min: pMin, max: pMax, ticks: { color: '#555', font: { size: 10 }, callback: v => '$' + v.toFixed(0) }, grid: { color: GRID } }
+    }
+  };
 
-  if (priceChart) {
-    priceChart.data = priceData;
-    priceChart.options.scales.y.min = pMin;
-    priceChart.options.scales.y.max = pMax;
-    priceChart.update();
-  } else {
-    priceChart = new Chart(document.getElementById('priceChart'), {
-      type: 'line',
-      data: priceData,
-      options: { ...baseOpts(pMin, pMax, true), scales: { ...baseOpts(pMin, pMax, true).scales, y: { ...baseOpts(pMin, pMax, true).scales.y, ticks: { color: '#555', font: { size: 10 }, callback: v => '$' + v.toFixed(0) } } } }
-    });
-  }
+  if (priceChart) { priceChart.data = priceData; priceChart.options = priceOpts; priceChart.update(); }
+  else { priceChart = new Chart(document.getElementById('priceChart'), { type: 'line', data: priceData, options: priceOpts }); }
 
   // ── TSI chart ──
-  const tsiMin = Math.floor(Math.min(...d.tsi, ...d.sig) - 5);
-  const tsiMax = Math.ceil(Math.max(...d.tsi, ...d.sig) + 5);
+  const tsiMin = Math.floor(Math.min(...tsi, ...sig) - 5);
+  const tsiMax = Math.ceil(Math.max(...tsi, ...sig) + 5);
   const tsiData = {
     labels,
     datasets: [
-      { label: 'TSI',    data: d.tsi, borderColor: '#42a5f5', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
-      { label: 'Signal', data: d.sig, borderColor: '#ffb300', borderWidth: 1.5, borderDash: [5,3], pointRadius: 0, tension: 0.3 },
-      { label: 'Zero',   data: prices.map(() => 0), borderColor: '#444', borderWidth: 1, pointRadius: 0, borderDash: [2,4] }
+      { label: 'TSI', data: tsi, borderColor: '#42a5f5', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+      { label: 'Signal', data: sig, borderColor: '#ffb300', borderWidth: 1.5, borderDash: [5, 3], pointRadius: 0, tension: 0.3 },
+      { label: 'Zero', data: prices.map(() => 0), borderColor: '#444', borderWidth: 1, pointRadius: 0, borderDash: [2, 4] }
     ]
   };
-
-  if (tsiChart) {
-    tsiChart.data = tsiData;
-    tsiChart.options.scales.y.min = tsiMin;
-    tsiChart.options.scales.y.max = tsiMax;
-    tsiChart.update();
-  } else {
-    tsiChart = new Chart(document.getElementById('tsiChart'), { type: 'line', data: tsiData, options: baseOpts(tsiMin, tsiMax) });
-  }
+  const tsiOpts = {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a1a2e', borderColor: '#333', borderWidth: 1, titleColor: '#888', bodyColor: '#ddd' } },
+    scales: {
+      x: { ticks: { color: '#555', font: { size: 10 }, maxTicksLimit: 12, maxRotation: 0 }, grid: { color: GRID } },
+      y: { min: tsiMin, max: tsiMax, ticks: { color: '#555', font: { size: 10 } }, grid: { color: GRID } }
+    }
+  };
+  if (tsiChart) { tsiChart.data = tsiData; tsiChart.options = tsiOpts; tsiChart.update(); }
+  else { tsiChart = new Chart(document.getElementById('tsiChart'), { type: 'line', data: tsiData, options: tsiOpts }); }
 
   // ── RSI chart ──
-  const mid = parseInt(document.getElementById('s-rsi-mid').value);
   const rsiData = {
     labels,
     datasets: [
-      { label: 'RSI',          data: d.rsi,                      borderColor: '#42a5f5', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
-      { label: '70 overbought',data: prices.map(() => 70),       borderColor: '#ff1744', borderWidth: 1,   pointRadius: 0, borderDash: [4,3] },
-      { label: 'Midline',      data: prices.map(() => mid),      borderColor: '#555',    borderWidth: 1,   pointRadius: 0, borderDash: [2,4] },
-      { label: '30 oversold',  data: prices.map(() => 30),       borderColor: '#00e676', borderWidth: 1,   pointRadius: 0, borderDash: [4,3] },
+      { label: 'RSI', data: rsi, borderColor: '#42a5f5', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+      { label: '70', data: prices.map(() => 70), borderColor: '#ff1744', borderWidth: 1, pointRadius: 0, borderDash: [4, 3] },
+      { label: '50', data: prices.map(() => 50), borderColor: '#555', borderWidth: 1, pointRadius: 0, borderDash: [2, 4] },
+      { label: '30', data: prices.map(() => 30), borderColor: '#00e676', borderWidth: 1, pointRadius: 0, borderDash: [4, 3] },
     ]
   };
-
-  if (rsiChart) {
-    rsiChart.data = rsiData;
-    rsiChart.update();
-  } else {
-    rsiChart = new Chart(document.getElementById('rsiChart'), { type: 'line', data: rsiData, options: baseOpts(0, 100) });
-  }
-
-  // ── Stats ──
-  document.getElementById('stat-long').textContent = d.longPts.length;
-  document.getElementById('stat-exit').textContent = d.exitPts.length;
-  document.getElementById('stat-bull').textContent = d.bullBars;
-  document.getElementById('stat-rsi').textContent  = d.rsi[d.rsi.length - 1].toFixed(1);
-}
-
-// ─── Wire sliders ─────────────────────────────────────────────
-function getParams() {
-  return {
-    rsiPeriod: +document.getElementById('s-rsi-period').value,
-    tsiLong:   +document.getElementById('s-tsi-long').value,
-    tsiShort:  +document.getElementById('s-tsi-short').value,
-    tsiSig:    +document.getElementById('s-tsi-signal').value,
-    rsiMid:    +document.getElementById('s-rsi-mid').value,
+  const rsiOpts = {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { display: false }, annotation: {
+      annotations: {
+        ob: { type: 'box', yMin: 70, yMax: 100, backgroundColor: 'rgba(255,23,68,0.05)', borderWidth: 0 },
+        os: { type: 'box', yMin: 0, yMax: 30, backgroundColor: 'rgba(0,230,118,0.05)', borderWidth: 0 },
+      }
+    }, tooltip: { backgroundColor: '#1a1a2e', borderColor: '#333', borderWidth: 1, titleColor: '#888', bodyColor: '#ddd' } },
+    scales: {
+      x: { ticks: { color: '#555', font: { size: 10 }, maxTicksLimit: 12, maxRotation: 0 }, grid: { color: GRID } },
+      y: { min: 0, max: 100, ticks: { color: '#555', font: { size: 10 } }, grid: { color: GRID } }
+    }
   };
+  if (rsiChart) { rsiChart.data = rsiData; rsiChart.options = rsiOpts; rsiChart.update(); }
+  else { rsiChart = new Chart(document.getElementById('rsiChart'), { type: 'line', data: rsiData, options: rsiOpts }); }
 }
 
-['s-rsi-period','s-tsi-long','s-tsi-short','s-tsi-signal','s-rsi-mid'].forEach(id => {
+// ─── Wire sliders ───────────────────────────────────────────
+['s-rsi-period', 's-tsi-long', 's-tsi-short', 's-tsi-signal', 's-sr-lookback'].forEach(id => {
   const el = document.getElementById(id);
   const valId = id.replace('s-', 'v-');
   el.addEventListener('input', () => {
     document.getElementById(valId).textContent = el.value;
-    const p = getParams();
-    buildCharts(computeSignals(p.tsiLong, p.tsiShort, p.tsiSig, p.rsiPeriod, p.rsiMid));
+    buildAll();
   });
 });
 
-// Initial render
-const p = getParams();
-buildCharts(computeSignals(p.tsiLong, p.tsiShort, p.tsiSig, p.rsiPeriod, p.rsiMid));
+// ─── Init ───────────────────────────────────────────────────
+(async () => {
+  try {
+    BARS = await fetchSPY();
+    document.getElementById('app-loading').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+    buildAll();
+  } catch (err) {
+    document.getElementById('app-loading').innerHTML =
+      `<div class="error-msg">Failed to fetch SPY data: ${err.message}<br><br>Try refreshing the page. If the issue persists, the CORS proxy may be temporarily unavailable.</div>`;
+  }
+})();
 </script>
 </body>
 </html>
