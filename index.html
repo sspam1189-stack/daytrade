@@ -911,20 +911,34 @@ function buildAll() {
   document.getElementById('stat-signals').style.color = lastSignal === 'Bullish' ? 'var(--green)' : lastSignal === 'Bearish' ? 'var(--red)' : 'var(--amber)';
   document.getElementById('stat-signals-detail').textContent = `Last: ${lastSignal} · ${bullSignals.length}▲ ${bearSignals.length}▼`;
 
-  // Increment-by-increment breakdown (next 5 increments)
+  // Day-by-day projection cards
+  // For intraday: show end-of-day for each projected trading day
+  // For daily: show each projected day
+  let cardIndices = [];
+  if (currentInterval === '1d') {
+    // Each point is a day, show first 5
+    for (let c = 0; c < Math.min(5, projMid.length); c++) cardIndices.push(c);
+  } else {
+    // Group by date, pick last bar of each day
+    const seen = {};
+    for (let i = 0; i < projLabels.length; i++) {
+      const dayStr = projLabels[i].split(',')[0] || projLabels[i].split(' ').slice(0,2).join(' ');
+      seen[dayStr] = i; // last index for this day
+    }
+    cardIndices = Object.values(seen).slice(0, 5);
+  }
   const incLabel = currentInterval === '15m' ? '15 Min' : currentInterval === '60m' ? '1 Hour' : 'Day';
-  document.getElementById('proj-title').textContent = `Next 5 ${incLabel} Increments`;
-  // Pick 5 evenly spaced points from projection
-  const cardCount = Math.min(5, projMid.length);
+  const cardTitle = currentInterval === '1d' ? 'Day' : 'Trading Day';
+  document.getElementById('proj-title').textContent = currentInterval === '1d' ? 'Next 5 Day Increments' : `Next ${cardIndices.length} ${incLabel} Trading Days`;
   let projDaysHTML = '';
-  for (let c = 0; c < cardCount; c++) {
-    const idx = c;
-    if (idx < 0 || idx >= projMid.length) continue;
+  for (let c = 0; c < cardIndices.length; c++) {
+    const idx = cardIndices[c];
+    if (idx >= projMid.length) continue;
     const change = projMid[idx] - curPrice;
     const changePct = (change / curPrice * 100).toFixed(2);
     const isUp = change >= 0;
     projDaysHTML += `<div class="proj-day">
-      <div class="day-label">${incLabel} ${c + 1}</div>
+      <div class="day-label">${cardTitle} ${c + 1}</div>
       <div class="day-date">${projLabels[idx] || ''}</div>
       <div class="day-mid">$${projMid[idx].toFixed(2)}</div>
       <div class="day-range">$${projLo[idx].toFixed(2)} – $${projHi[idx].toFixed(2)}</div>
