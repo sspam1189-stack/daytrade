@@ -864,8 +864,9 @@ function buildAll() {
   for (let c = 0; c < cardIndices.length; c++) {
     const idx = cardIndices[c];
     if (idx >= projMid.length) continue;
-    const change = projMid[idx] - curPrice;
-    const changePct = (change / curPrice * 100).toFixed(2);
+    const prevClose = lastBar.close;
+    const change = projMid[idx] - prevClose;
+    const changePct = (change / prevClose * 100).toFixed(2);
     const isUp = change >= 0;
     projDaysHTML += `<div class="proj-day">
       <div class="day-label">${cardTitle} ${c + 1}</div>
