@@ -327,9 +327,12 @@ const zoomPlugin = {
 // ─── Current timeframe state ────────────────────────────────
 let currentInterval = '1d';
 let currentRange = '1mo';
+const dataCache = {}; // cache by interval key
 
 // ─── Fetch real SPY data ────────────────────────────────────
 async function fetchSPY() {
+  const cacheKey = `${currentInterval}_${currentRange}`;
+  if (dataCache[cacheKey]) return dataCache[cacheKey];
   const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=${currentRange}&interval=${currentInterval}&includePrePost=false`;
 
   async function tryAllOrigins() {
@@ -379,14 +382,17 @@ async function fetchSPY() {
       // Filter out weekends from intraday data, then trim to N trading days
       // Filter out weekends from all data
       const tradingBars = bars.filter(b => b.date.getDay() !== 0 && b.date.getDay() !== 6);
+      let result;
       if (currentInterval === '15m' || currentInterval === '60m') {
         const tradingDays = currentInterval === '15m' ? 5 : 7;
         const uniqueDates = [...new Set(tradingBars.map(b => b.date.toDateString()))];
         const keepDates = new Set(uniqueDates.slice(-tradingDays));
-        return tradingBars.filter(b => keepDates.has(b.date.toDateString()));
+        result = tradingBars.filter(b => keepDates.has(b.date.toDateString()));
+      } else {
+        result = tradingBars;
       }
-      return tradingBars;
-      return bars;
+      dataCache[cacheKey] = result;
+      return result;
     } catch (e) { lastErr = e; }
   }
   throw lastErr || new Error('All proxies failed');
@@ -1283,6 +1289,7 @@ document.querySelectorAll('.tf-tab').forEach(tab => {
 });
 document.getElementById('refresh-now').addEventListener('click', () => {
   document.getElementById('refresh-now').textContent = 'Refreshing...';
+  Object.keys(dataCache).forEach(k => delete dataCache[k]); // clear cache
   refreshData().then(() => { document.getElementById('refresh-now').textContent = 'Refresh Now'; });
 });
 
