@@ -949,8 +949,11 @@ function buildAll() {
     projDaysHTML += `<div class="proj-day">
       <div class="day-label">${cardTitle} ${c + 1}</div>
       <div class="day-date">${projLabels[idx] || ''}</div>
+      <div style="font-size:9px;color:#555;margin-top:6px">TARGET</div>
       <div class="day-mid">$${projMid[idx].toFixed(2)}</div>
+      <div style="font-size:9px;color:#555;margin-top:4px">RANGE</div>
       <div class="day-range">$${projLo[idx].toFixed(2)} – $${projHi[idx].toFixed(2)}</div>
+      <div style="font-size:9px;color:#555;margin-top:4px">FROM CURRENT</div>
       <div class="day-change ${isUp ? 'up' : 'down'}">${isUp ? '+' : ''}${changePct}%</div>
     </div>`;
   }
