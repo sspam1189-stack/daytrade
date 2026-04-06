@@ -803,24 +803,33 @@ function buildAll() {
 
   // Scale to actual dollar move using ATR
   const lastAtrVal = atr[atr.length - 1];
-  const dailyMove = directionScore * lastAtrVal * 0.7; // 70% of ATR per day — matches recent volatility
+  // Scale move per step based on interval
+  // 1d = 1 bar/day, 1h = ~6.5 bars/day, 15m = ~26 bars/day
+  const barsPerDay = currentInterval === '15m' ? 26 : currentInterval === '60m' ? 7 : 1;
+  const stepMove = (directionScore * lastAtrVal * 0.7) / barsPerDay;
+  const stepVol = dailyVol / Math.sqrt(barsPerDay);
+
+  // Number of projection steps: 2 trading days worth of bars for intraday, 5 days for daily
+  const projSteps = currentInterval === '15m' ? 2 * 26 : currentInterval === '60m' ? 2 * 7 : 5;
+  // Step interval in minutes
+  const stepMinutes = currentInterval === '15m' ? 15 : currentInterval === '60m' ? 60 : 1440;
 
   let projPrice = curPrice;
-  for (let d = 0; d < actualProjDays; d++) {
-    const futDate = new Date(today);
-    if (futDate.getDay() === 0) futDate.setDate(futDate.getDate() + 1);
-    if (futDate.getDay() === 6) futDate.setDate(futDate.getDate() + 2);
-    let added = 0;
-    while (added < d) {
-      futDate.setDate(futDate.getDate() + 1);
-      if (futDate.getDay() !== 0 && futDate.getDay() !== 6) added++;
+  const lastBarDate = new Date(BARS[BARS.length - 1].date);
+  for (let d = 0; d < projSteps; d++) {
+    const futDate = new Date(lastBarDate.getTime() + (d + 1) * stepMinutes * 60000);
+    // Skip weekends
+    if (futDate.getDay() === 0 || futDate.getDay() === 6) continue;
+    // Skip outside market hours (9:30-16:00 ET) for intraday
+    if (currentInterval !== '1d') {
+      const h = futDate.getHours(), m = futDate.getMinutes();
+      const mins = h * 60 + m;
+      if (mins < 570 || mins >= 960) continue; // 9:30=570, 16:00=960
     }
     projLabels.push(fmt(futDate));
 
-    // Apply daily move — no artificial caps, let the data speak
-    projPrice += dailyMove;
-
-    const spread = dailyVol * Math.sqrt(d + 1);
+    projPrice += stepMove;
+    const spread = stepVol * Math.sqrt(d + 1);
     projMid.push(+projPrice.toFixed(2));
     projHi.push(+(projPrice + spread).toFixed(2));
     projLo.push(+(projPrice - spread).toFixed(2));
