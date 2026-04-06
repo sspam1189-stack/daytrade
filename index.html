@@ -1000,7 +1000,7 @@ function buildAll() {
   trendLines.forEach((tl, i) => {
     const color = tl.type === 'support' ? 'rgba(0,230,118,0.7)' : 'rgba(255,23,68,0.7)';
     const slope = (tl.endPrice - tl.startPrice) / (tl.endIdx - tl.startIdx);
-    const extendedEndIdx = tl.endIdx + actualProjDays;
+    const extendedEndIdx = tl.endIdx + projLen;
     const extendedEndPrice = tl.startPrice + slope * (extendedEndIdx - tl.startIdx);
     const extendedLabel = projLabels[projLabels.length - 1];
     annotations['trend' + i] = {
@@ -1025,7 +1025,8 @@ function buildAll() {
   });
 
   const allLabels = [...labels, ...projLabels];
-  const padded = (arr) => [...arr, ...Array(actualProjDays).fill(null)];
+  const projLen = projLabels.length;
+  const padded = (arr) => [...arr, ...Array(projLen).fill(null)];
   const projPadded = (arr) => [...Array(prices.length - 1).fill(null), prices[prices.length - 1], ...arr]; // connect from last real price
 
   // ── Price chart ──
