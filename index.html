@@ -223,7 +223,7 @@
     <div class="chart-title">Daily Price + EMAs + Support/Resistance</div>
     <div class="legend">
       <span class="leg"><span class="leg-line" style="background:#fff"></span>Close</span>
-      <span class="leg"><span class="leg-line" style="background:var(--purple)"></span>EMA 7</span>
+      <span class="leg"><span class="leg-line" style="background:var(--purple)"></span>EMA 9</span>
       <span class="leg"><span class="leg-line" style="background:var(--cyan)"></span>EMA 21</span>
       <span class="leg"><span class="leg-line" style="background:var(--orange)"></span>EMA 50</span>
       <span class="leg"><span class="leg-line" style="background:rgba(0,230,118,.4);height:6px"></span>Support</span>
@@ -632,7 +632,7 @@ function buildAll() {
   const tsiShort = +document.getElementById('s-tsi-short').value;
   const tsiSig = +document.getElementById('s-tsi-signal').value;
 
-  const e7 = emaArr(prices, 7);
+  const e7 = emaArr(prices, 9);
   const e21 = emaArr(prices, 21);
   const e50 = emaArr(prices, 50);
   const { tsi, sig } = computeTSI(prices, tsiLong, tsiShort, tsiSig);
@@ -957,7 +957,7 @@ function buildAll() {
     { text: 'Price within 3% of support', met: nearSupDist < 0.03 },
     { text: `RSI rising or below 40 (${rsiVal.toFixed(1)})`, met: rsiRisingNow || rsiVal < 40 },
     { text: 'TSI above signal line', met: tsi[last] > sig[last] },
-    { text: 'EMA 7 above EMA 21', met: ema7Above21 },
+    { text: 'EMA 9 above EMA 21', met: ema7Above21 },
     { text: 'Price above EMA 21', met: priceAbove21 },
     { text: 'Projection trending up', met: projMid[projMid.length-1] > curPrice },
   ];
@@ -966,7 +966,7 @@ function buildAll() {
     { text: 'Price within 3% of resistance', met: nearResDist < 0.03 },
     { text: `RSI falling or above 60 (${rsiVal.toFixed(1)})`, met: rsiFallingNow || rsiVal > 60 },
     { text: 'TSI below signal line', met: tsi[last] < sig[last] },
-    { text: 'EMA 7 below EMA 21', met: !ema7Above21 },
+    { text: 'EMA 9 below EMA 21', met: !ema7Above21 },
     { text: 'Price below EMA 21', met: !priceAbove21 },
     { text: 'Projection trending down', met: projMid[projMid.length-1] < curPrice },
   ];
@@ -1048,7 +1048,7 @@ function buildAll() {
     labels: allLabels,
     datasets: [
       { label: 'Close', data: padded(prices), borderColor: '#fff', borderWidth: 1.8, pointRadius: 2, pointBackgroundColor: '#fff', tension: 0.25, fill: false },
-      { label: 'EMA 7', data: padded(e7), borderColor: '#ce93d8', borderWidth: 1.2, pointRadius: 0, tension: 0.3 },
+      { label: 'EMA 9', data: padded(e7), borderColor: '#ce93d8', borderWidth: 1.2, pointRadius: 0, tension: 0.3 },
       { label: 'EMA 21', data: padded(e21), borderColor: '#00e5ff', borderWidth: 1.2, pointRadius: 0, tension: 0.3 },
       { label: 'EMA 50', data: padded(e50), borderColor: '#ffa726', borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
       { label: 'BB Upper', data: padded(bb.map(b => b.upper)), borderColor: 'rgba(206,147,216,0.3)', borderWidth: 1, pointRadius: 0, tension: 0.3, fill: '+1', backgroundColor: 'rgba(206,147,216,0.06)' },
