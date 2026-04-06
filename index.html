@@ -994,25 +994,27 @@ function buildAll() {
   // Extend labels and datasets with nulls for real data, values for projection
   const projLen = projLabels.length;
   // ── Trend lines (extended into projection zone) ──
+  const allLabels = [...labels, ...projLabels];
   const trendLines = findTrendLines(BARS, lookback);
   trendLines.forEach((tl, i) => {
     const color = tl.type === 'support' ? 'rgba(0,230,118,0.7)' : 'rgba(255,23,68,0.7)';
     const slope = (tl.endPrice - tl.startPrice) / (tl.endIdx - tl.startIdx);
-    const extendedEndIdx = tl.endIdx + projLen;
-    const extendedEndPrice = tl.startPrice + slope * (extendedEndIdx - tl.startIdx);
-    const extendedLabel = projLabels[projLabels.length - 1];
+    // Extend to end of projection
+    const extEndIdx = labels.length + projLen - 1;
+    const extEndPrice = tl.startPrice + slope * (extEndIdx - tl.startIdx);
     annotations['trend' + i] = {
       type: 'line',
-      xMin: labels[tl.startIdx],
-      xMax: extendedLabel,
+      xMin: tl.startIdx,
+      xMax: extEndIdx,
+      xScaleID: 'x',
       yMin: tl.startPrice,
-      yMax: extendedEndPrice,
+      yMax: extEndPrice,
       borderColor: color,
       borderWidth: 2,
       borderDash: [6, 3],
       label: {
         display: true,
-        content: (tl.type === 'support' ? 'S trend → $' : 'R trend → $') + extendedEndPrice.toFixed(0),
+        content: (tl.type === 'support' ? 'S trend → $' : 'R trend → $') + extEndPrice.toFixed(0),
         position: 'end',
         backgroundColor: 'rgba(0,0,0,0.6)',
         color: color,
@@ -1022,7 +1024,6 @@ function buildAll() {
     };
   });
 
-  const allLabels = [...labels, ...projLabels];
   const padded = (arr) => [...arr, ...Array(projLen).fill(null)];
   const projPadded = (arr) => [...Array(prices.length - 1).fill(null), prices[prices.length - 1], ...arr]; // connect from last real price
 
