@@ -741,8 +741,8 @@ function buildAll() {
     };
   });
 
-  // ── Indicator-driven price projection (5 days forward) ──
-  const actualProjDays = 5;
+  // ── Indicator-driven price projection ──
+  const actualProjDays = currentInterval === '15m' ? 2 : 5;
   const projLabels = [];
   const projMid = [], projHi = [], projLo = [];
   const lastDate = BARS[BARS.length - 1].date;
