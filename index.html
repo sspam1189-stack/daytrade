@@ -1169,20 +1169,54 @@ function updateTimestamp() {
   document.getElementById('last-update').textContent = 'Updated ' + now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-// ─── Live quote for current price + open ───────────────────
+// ─── Live quote for current price + today's open ───────────
 async function fetchLiveQuote() {
-  const AV_KEY = 'RIBXT3XYLI69PC0Q';
+  // Try Yahoo intraday via proxy for real-time data
+  const yahooUrl = 'https://query2.finance.yahoo.com/v8/finance/chart/SPY?range=1d&interval=5m&includePrePost=false';
+  const proxies = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(yahooUrl)}`,
+  ];
+  for (const proxy of proxies) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch(proxy, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text.startsWith('{')) continue;
+      const json = JSON.parse(text);
+      if (!json.chart || !json.chart.result) continue;
+      const meta = json.chart.result[0].meta;
+      const quotes = json.chart.result[0].indicators.quote[0];
+      const price = meta.regularMarketPrice;
+      // Today's open = first bar's open
+      const open = quotes.open.find(v => v != null);
+      if (price && open) {
+        const chgPct = ((price - open) / open * 100).toFixed(2);
+        const isUp = price >= open;
+        document.getElementById('stat-price').textContent = '$' + price.toFixed(2);
+        document.getElementById('stat-date').textContent = 'Live';
+        document.getElementById('stat-open').textContent = '$' + open.toFixed(2);
+        document.getElementById('stat-open-chg').textContent = `${isUp ? '+' : ''}${chgPct}% from open`;
+        document.getElementById('stat-open-chg').style.color = isUp ? 'var(--green)' : 'var(--red)';
+        updateTimestamp();
+        return;
+      }
+    } catch (e) { /* try next */ }
+  }
+  // Fallback: Alpha Vantage GLOBAL_QUOTE
   try {
+    const AV_KEY = 'RIBXT3XYLI69PC0Q';
     const res = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=${AV_KEY}`);
     const json = await res.json();
     const q = json['Global Quote'];
     if (!q) return;
     const price = parseFloat(q['05. price']);
     const open = parseFloat(q['02. open']);
-    const prevClose = parseFloat(q['08. previous close']);
-    const chgPct = ((price - open) / open * 100).toFixed(2);
-    const dayChgPct = ((price - prevClose) / prevClose * 100).toFixed(2);
     const isUp = price >= open;
+    const chgPct = ((price - open) / open * 100).toFixed(2);
     document.getElementById('stat-price').textContent = '$' + price.toFixed(2);
     document.getElementById('stat-date').textContent = q['07. latest trading day'];
     document.getElementById('stat-open').textContent = '$' + open.toFixed(2);
