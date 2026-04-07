@@ -847,7 +847,7 @@ function buildAll() {
   const incLabel = currentInterval === '15m' ? '15 Min' : currentInterval === '60m' ? '1 Hour' : 'Day';
   const cardTitle = currentInterval === '1d' ? 'Day' : 'Trading Day';
   document.getElementById('proj-title').textContent = 'Projection';
-  const lastBar = BARS.length > 1 ? BARS[BARS.length - 2] : BARS[BARS.length - 1];
+  const lastBar = BARS[BARS.length - 1];
   const dayChg = lastBar.close - lastBar.open;
   const dayChgPct = (dayChg / lastBar.open * 100).toFixed(2);
   const dayUp = dayChg >= 0;
